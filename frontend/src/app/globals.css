@@ -1,0 +1,78 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Dark theme by default */
+  --background: #131315;
+  --foreground: #FFFFFF;
+  --card-background: #1A1A1D;
+  --border-color: #27272A;
+  --accent-purple: #7e62ef;
+  --accent-purple-hover: #6B4FE6;
+  --text-secondary: #A1A1AA;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+body {
+  color: var(--foreground);
+  background: var(--background);
+  font-family: var(--font-geist-sans);
+}
+
+/* Custom utility classes */
+.card {
+  @apply bg-[var(--card-background)] rounded-lg border border-[var(--border-color)];
+}
+
+.accent-button {
+  @apply bg-[var(--accent-purple)] hover:bg-[var(--accent-purple-hover)] text-white px-4 py-2 rounded-lg transition-colors;
+}
+
+.secondary-button {
+  @apply bg-[var(--card-background)] hover:bg-[#353535] text-white px-4 py-2 rounded-lg border border-[var(--border-color)] transition-colors;
+}
+
+.tooltip-wrapper {
+  position: relative;
+}
+
+.tooltip {
+  visibility: hidden;
+  position: absolute;
+  bottom: -8px;
+  left: 50%;
+  transform: translateX(-50%) translateY(100%);
+  background-color: var(--accent-purple);
+  color: white;
+  text-align: center;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  white-space: nowrap;
+  z-index: 50;
+  opacity: 0;
+  transition: opacity 0.2s, visibility 0.2s;
+}
+
+.tooltip-wrapper:hover .tooltip {
+  visibility: visible;
+  opacity: 1;
+}
+
+.tooltip::before {
+  content: '';
+  position: absolute;
+  top: -4px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-width: 4px;
+  border-style: solid;
+  border-color: transparent transparent var(--accent-purple) transparent;
+}

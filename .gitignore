@@ -1,0 +1,35 @@
+/venv/
+venv/
+venv/
+
+__pycache__/
+*.py[cod]
+
+.DS_Store
+.DS_Store
+Thumbs.db
+
+*.log
+*.tmp
+
+# Environment files
+/backend/.env
+/backend/.env.development
+/backend/.env.production
+/backend/.env.local
+
+# But allow example file
+!/backend/.env.example
+
+# Node dependencies
+node_modules/
+/frontend/node_modules/
+
+# Environment files
+/frontend/.env.local
+/frontend/.env.development
+/frontend/.env.production
+/frontend/.env.example
+
+/home/ec2-user/megaton-roto/exports
+/home/ec2-user/megaton-roto/megaton-roto/exports

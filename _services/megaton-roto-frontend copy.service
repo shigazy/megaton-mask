@@ -1,0 +1,26 @@
+[Unit]
+Description=Megaton Frontend Service
+After=network.target
+
+[Service]
+Type=simple
+User=ec2-user
+WorkingDirectory=/home/ec2-user/megaton-roto/frontend
+Environment=PATH=/home/ec2-user/.nvm/versions/node/v22.13.0/bin:/usr/local/bin:/usr/bin:/bin
+Environment=NODE_ENV=production
+ExecStart=/home/ec2-user/.nvm/versions/node/v22.13.0/bin/npm run start
+
+# Restart configuration
+Restart=always
+RestartSec=10
+StartLimitIntervalSec=0
+StartLimitBurst=0
+
+[Install]
+WantedBy=multi-user.target
+
+# sudo cp /home/ec2-user/megaton-roto/_services/megaton-roto-frontend.service /etc/systemd/system/megaton-frontend.service
+# sudo systemctl daemon-reload
+#sudo systemctl restart megaton-frontend
+#sudo systemctl status megaton-frontend
+#sudo journalctl -u megaton-frontend -f

@@ -1,0 +1,13 @@
+aws ssm put-parameter \
+    --name "/megaton/stripe_test_key" \
+    --value "xxx" \
+    --type "SecureString" \
+    --description "Stripe test publishable key" \
+    --overwrite
+
+aws ssm put-parameter \
+    --name "/megaton/stripe_test_secret" \
+    --value "xxx" \
+    --type "SecureString" \
+    --description "Stripe test secret key" \
+    --overwrite

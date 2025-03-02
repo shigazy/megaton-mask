@@ -1,0 +1,77 @@
+{
+    "// IMPORTANT": "If you modify this file, be sure to update both:",
+    "// Frontend": "megaton-roto/frontend/src/config/membershipConfig.ts",
+    "// Backend": "megaton-roto/backend/app/config/membership.py",
+    "defaultMembership": {
+        "tier": "free",
+        "status": "active",
+        "auto_renewal": true,
+        "stripe_subscription_id": null,
+        "updated_at": null,
+        "current_period_end": null,
+        "cancel_at": null,
+        "pending_tier_change": null
+    },
+    "TIER_CREDITS": {
+        "basic": 100,
+        "pro": 250,
+        "enterprise": 1000
+    },
+    "SUBSCRIPTION_PRICES": {
+        "basic": "price_1Qq6sHCx0G73BQ1Dh1WZkPPw",
+        "pro": "price_1QqeW9Cx0G73BQ1DGWsJvyBh",
+        "enterprise": "price_1Qq6srCx0G73BQ1DlDqeRhES"
+    },
+    "TIER_FEATURES": {
+        "free": {
+            "name": "Free",
+            "price": "$0",
+            "features": [
+                "Credits per month",
+                "Basic video quality",
+                "Email support",
+                "1GB storage"
+            ]
+        },
+        "basic": {
+            "name": "Basic",
+            "price": "$10/month",
+            "features": [
+                "100 credits per month",
+                "Basic video quality",
+                "Email support",
+                "1GB storage"
+            ]
+        },
+        "pro": {
+            "name": "Pro",
+            "price": "$20/month",
+            "features": [
+                "250 credits per month",
+                "HD video quality",
+                "Priority support",
+                "5GB storage",
+                "Advanced editing tools"
+            ]
+        },
+        "enterprise": {
+            "name": "Enterprise",
+            "price": "$50/month",
+            "features": [
+                "1000 credits per month",
+                "4K video quality",
+                "24/7 priority support",
+                "25GB storage",
+                "Advanced editing tools",
+                "Custom branding",
+                "API access"
+            ]
+        }
+    },
+    "TIER_ORDER": [
+        "free",
+        "basic",
+        "pro",
+        "enterprise"
+    ]
+}

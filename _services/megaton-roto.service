@@ -1,0 +1,15 @@
+[Unit]
+Description=Megaton Roto FastAPI Application (Development)
+After=network.target
+
+[Service]
+User=ec2-user
+WorkingDirectory=/home/ec2-user/megaton-roto/backend
+Environment="PATH=/opt/conda/envs/pytorch310/bin"
+ExecStart=/opt/conda/envs/pytorch310/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
