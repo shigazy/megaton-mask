@@ -1,0 +1,23 @@
+# Development service: /etc/systemd/system/megaton-roto-dev.service
+[Unit]
+Description=Megaton Roto Development Service
+After=network.target
+
+[Service]
+User=ec2-user
+WorkingDirectory=/home/ec2-user/megaton-roto-dev/backend
+ExecStart=/opt/conda/envs/pytorch310/bin/python -m uvicorn app.main:app --host 0.0.0.0 --port 8001
+Restart=always
+Environment="ENV=development"
+MemoryMax=24G
+# Add memory-related settings
+MemorySwapMax=0
+OOMScoreAdjust=-900
+
+[Install]
+WantedBy=multi-user.target
+
+# sudo cp /home/ec2-user/megaton-roto-dev/_services/megaton-roto-dev.service /etc/systemd/system/megaton-roto-dev.service
+# sudo systemctl daemon-reload
+# sudo systemctl restart megaton-roto-dev
+# sudo systemctl status megaton-roto-dev

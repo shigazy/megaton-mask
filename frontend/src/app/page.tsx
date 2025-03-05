@@ -219,6 +219,7 @@ export default function Home() {
               onUploadSuccess={fetchVideos}
               fetchVideos={fetchVideos}
               initialVideo={selectedVideo}
+              setInitialVideo={setSelectedVideo}
               key={selectedVideo?.id}
             />
             <div className="mt-8">

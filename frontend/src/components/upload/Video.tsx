@@ -392,7 +392,7 @@ const AnnotationLayer = ({
   );
 };
 
-export const VideoUpload = ({ onUploadSuccess, fetchVideos, initialVideo }: VideoUploadProps) => {
+export const VideoUpload = ({ onUploadSuccess, fetchVideos, initialVideo, setInitialVideo }: VideoUploadProps) => {
   const { setStatus } = useStatus();
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -431,6 +431,9 @@ export const VideoUpload = ({ onUploadSuccess, fetchVideos, initialVideo }: Vide
   const [currentTime, setCurrentTime] = useState(0);
   const [greenscreenUrl, setGreenscreenUrl] = useState<string | null>(null);
   const [duration, setDuration] = useState(0);
+  const [isPolling, setIsPolling] = useState(false);
+  const [pollCount, setPollCount] = useState(0);
+  const MAX_POLLS = 300; // Safety limit (5 minutes at 1 second intervals)
 
   const videoStore = useVideoStore();
   const { fetchCredits } = useCredits();
@@ -438,10 +441,11 @@ export const VideoUpload = ({ onUploadSuccess, fetchVideos, initialVideo }: Vide
   const maskVideoRef = useRef<HTMLVideoElement>(null);
   const greenscreenVideoRef = useRef<HTMLVideoElement>(null);
 
-  // Refresh URLs periodically to prevent expiration
+  // Modify the refreshUrls useEffect
   useEffect(() => {
-    if (!initialVideo?.id) return;
+    if (!initialVideo?.id || isGenerating) return; // Don't refresh during generation
 
+    let intervalId: NodeJS.Timeout;
     const refreshUrls = async () => {
       try {
         const response = await fetch(
@@ -471,17 +475,21 @@ export const VideoUpload = ({ onUploadSuccess, fetchVideos, initialVideo }: Vide
 
       } catch (error) {
         console.error('Error refreshing URLs:', error);
+        // If we get an auth error, clear the interval to stop refreshing
+        if (error instanceof Error && error.message.includes('401')) {
+          clearInterval(intervalId);
+        }
       }
     };
-
-    // Refresh every 45 minutes (presigned URLs expire after 1 hour)
-    const interval = setInterval(refreshUrls, 45 * 60 * 1000);
 
     // Initial refresh
     refreshUrls();
 
-    return () => clearInterval(interval);
-  }, [initialVideo?.id, videoUrl, maskVideoUrl]);
+    // Refresh every 45 minutes (presigned URLs expire after 1 hour)
+    intervalId = setInterval(refreshUrls, 45 * 60 * 1000);
+
+    return () => clearInterval(intervalId);
+  }, [initialVideo?.id, videoUrl, maskVideoUrl, isGenerating]);
 
 
   // Create a function to force redraw that can be called from anywhere
@@ -820,53 +828,84 @@ export const VideoUpload = ({ onUploadSuccess, fetchVideos, initialVideo }: Vide
   }, []);
 
   const pollTaskStatus = async (taskId: string) => {
-    try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/tasks/${taskId}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
+    let isPolling = true;
+    let pollCount = 0;
+    const MAX_POLLS = 300; // Safety limit (5 minutes at 1 second intervals)
 
-      if (!response.ok) throw new Error('Failed to fetch task status');
+    while (isPolling && pollCount < MAX_POLLS) {
+      pollCount++;
 
-      const data = await response.json();
+      try {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/tasks/${taskId}`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        });
 
-      // Show mask as soon as it's available
-      if (data.maskUrl) {
-        setMaskVideoUrl(data.maskUrl);
-      }
-
-      // Handle different status cases
-      switch (data.status) {
-        case 'pending':
-        case 'processing':
-          // Continue polling
-          await new Promise(resolve => setTimeout(resolve, 1000));
-          return pollTaskStatus(taskId);
-
-        case 'completed':
-          console.log('Task completed successfully');
-          fetchVideos();
-          await fetchCredits();
-          setStatus('Masks generated successfully', 'success');
-          return data;
-
-        case 'failed':
-          setVideoError(data.errorMessage || 'Processing failed');
+        if (!response.ok) {
+          console.error('Failed to fetch task status');
+          setVideoError('Failed to check processing status');
           setIsProcessing(false);
-          throw new Error(data.errorMessage || 'Processing failed');
+          isPolling = false;
+          break;
+        }
 
-        default:
-          // Keep polling for any other status
-          await new Promise(resolve => setTimeout(resolve, 1000));
-          return pollTaskStatus(taskId);
+        const data = await response.json();
+        console.log(`Poll #${pollCount} - Task status:`, data.status);
+
+        // Show mask as soon as it's available
+        if (data.maskUrl) {
+          setMaskVideoUrl(data.maskUrl);
+        }
+
+        // Handle different status cases
+        switch (data.status) {
+          case 'pending':
+          case 'processing':
+            // Continue polling after delay
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            break;
+
+          case 'completed':
+            console.log('Task completed successfully');
+            fetchVideos();
+            await fetchCredits();
+            setStatus('Masks generated successfully', 'success');
+            setIsProcessing(false);
+            isPolling = false; // Stop polling
+            return data;
+
+          case 'failed':
+            console.error('Task failed:', data.errorMessage || 'Processing failed');
+            setVideoError(data.errorMessage || 'Processing failed');
+            setIsProcessing(false);
+            isPolling = false; // Stop polling
+            return data;
+
+          default:
+            console.warn(`Unknown task status: ${data.status}`);
+            // For unknown status, poll a few more times then stop
+            if (pollCount > 5) {
+              console.log('Stopping polling after 5 attempts with unknown status');
+              setIsProcessing(false);
+              isPolling = false;
+            }
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            break;
+        }
+      } catch (error) {
+        console.error('Error polling task status:', error);
+        setVideoError('Failed to check processing status');
+        setIsProcessing(false);
+        isPolling = false; // Stop polling on error
       }
+    }
 
-    } catch (error) {
-      console.error('Error polling task status:', error);
-      setVideoError('Failed to check processing status');
+    // If we reached the maximum number of polls
+    if (pollCount >= MAX_POLLS) {
+      console.warn('Reached maximum number of status polls');
+      setVideoError('Processing is taking longer than expected');
       setIsProcessing(false);
-      throw error;
     }
   };
 

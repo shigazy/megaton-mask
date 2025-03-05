@@ -1,0 +1,26 @@
+[Unit]
+Description=Megaton Frontend Service
+After=network.target
+
+[Service]
+Type=simple
+User=ec2-user
+WorkingDirectory=/home/ec2-user/megaton-roto-dev/frontend
+Environment=PATH=/home/ec2-user/.nvm/versions/node/v22.13.0/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/home/ec2-user/.nvm/versions/node/v22.13.0/bin/npm run dev
+MemoryMax=12G
+
+# Restart configuration
+Restart=always
+RestartSec=10
+StartLimitIntervalSec=0
+StartLimitBurst=0
+
+[Install]
+WantedBy=multi-user.target
+
+# sudo cp /home/ec2-user/megaton-roto-dev/_services/megaton-roto-frontend-dev.service /etc/systemd/system/megaton-roto-frontend-dev.service
+# sudo systemctl daemon-reload
+#sudo systemctl restart megaton-roto-frontend-dev
+#sudo systemctl status megaton-roto-frontend-dev
+#sudo journalctl -u megaton-roto-frontend-dev -f

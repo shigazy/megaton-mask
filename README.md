@@ -10,6 +10,34 @@ pip install -r requirements.txt
 
 /node_modules
 
+## CLI Commands:
+
+### Log Viewing Commands:
+
+- `frontdevlog` - View frontend development service logs
+- `backdevlog` - View backend development service logs 
+- `frontlog` - View production frontend logs
+- `backlog` - View production backend logs
+- `nginxlog` - View Nginx error logs
+
+### Kill Commands:
+
+# Find processes using port 3000
+sudo fuser 3000/tcp
+
+# Kill all processes using port 3000
+sudo fuser -k 3000/tcp
+
+sudo fuser -k 3001/tcp && sudo systemctl restart megaton-roto-frontend-dev.service
+
+# Find processes using port 8000
+sudo fuser 8000/tcp
+
+# Kill all processes using port 8000
+sudo fuser -k 8000/tcp
+
+sudo fuser -k 8001/tcp && sudo systemctl restart megaton-roto-backend-dev.service
+
 ## Available Scripts
 
 - `npm run dev` - Start development server

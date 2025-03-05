@@ -30,6 +30,5 @@ node_modules/
 /frontend/.env.development
 /frontend/.env.production
 /frontend/.env.example
+/frontend/exports
 
-/home/ec2-user/megaton-roto/exports
-/home/ec2-user/megaton-roto/megaton-roto/exports

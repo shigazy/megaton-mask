@@ -16,6 +16,9 @@ import logging
 import cv2
 from PIL import Image
 import io
+import gc
+import torch
+import numpy as np
 
 logger = logging.getLogger(__name__)
 
@@ -68,6 +71,7 @@ async def process_video_masks(
     from inference.manager import inference_manager
     
     temp_files = []
+    db = None
     try:
         # Get video and task from database
         db = SessionLocal()
@@ -121,14 +125,34 @@ async def process_video_masks(
             method=method
         )
 
-        # Save masks to video file
+        # Memory optimization: Process masks in chunks to avoid OOM
+        logger.info(f"Saving masks to video file, shape: {masks.shape}")
         height, width = masks[0].shape[:2]
         fourcc = cv2.VideoWriter_fourcc(*'mp4v')
         out = cv2.VideoWriter(temp_mask.name, fourcc, fps, (width, height))
         
-        for mask in masks:
-            out.write(mask)
+        # Write masks in smaller batches to reduce memory usage
+        chunk_size = 100  # Process 100 frames at a time
+        for i in range(0, len(masks), chunk_size):
+            chunk_end = min(i + chunk_size, len(masks))
+            for j in range(i, chunk_end):
+                out.write(masks[j])
+            
+            # Clear processed chunk from memory
+            if i + chunk_size < len(masks):
+                # Create a new array without the processed frames
+                masks = np.concatenate([np.zeros((chunk_end-i, height, width, 3), dtype=masks.dtype), 
+                                       masks[chunk_end:]])
+                gc.collect()
+                logger.info(f"Processed mask frames {i}-{chunk_end-1}")
+        
         out.release()
+        
+        # Clear masks from memory completely
+        del masks
+        gc.collect()
+        torch.cuda.empty_cache()
+        logger.info("Masks saved to video file, cleared from memory")
 
         # Process the mask video if it's a super video
         if super:
@@ -146,8 +170,6 @@ async def process_video_masks(
         # Upload results to S3
         logger.info("Starting S3 upload...")
         mask_key = f"users/{video.user_id}/masks/{video_id}_mask.mp4"
-        # Upload results to S3
-        logger.info(f"Starting S3 upload to {mask_key}...")
         
         # Check if object exists
         try:
@@ -171,27 +193,62 @@ async def process_video_masks(
         task.status = "processing greenscreen"
         task.completed_at = datetime.utcnow()
         formatted_points = format_points(points)
-        print(formatted_points)
         video.bbox = bbox
         video.points = formatted_points
         db.commit()
 
-        # Create green screen version
+        # Split the greenscreen creation into a separate task to reduce memory pressure
+        await create_greenscreen_async(video_id, process_video_path.name, upload_path, task_id)
+
+    except Exception as e:
+        logger.error(f"Error occurred: {str(e)}")
+        if task and db:
+            task.status = "failed"
+            task.error_message = str(e)
+            db.commit()
+        raise
+    finally:
+        inference_manager.cleanup()  # Clean up GPU resources
+        if db:
+            db.close()
+        # Clean up temporary files
+        for temp_file in temp_files:
+            try:
+                os.unlink(temp_file)
+            except Exception as e:
+                logger.error(f"Error removing temporary file {temp_file}: {str(e)}")
+
+# Add this new function to handle greenscreen creation asynchronously
+async def create_greenscreen_async(video_id, original_video_path, mask_video_path, task_id):
+    """Create greenscreen video in a separate process to reduce memory pressure"""
+    temp_files = []
+    db = None
+    try:
+        db = SessionLocal()
+        video = db.query(Video).filter(Video.id == video_id).first()
+        task = db.query(Task).filter(Task.id == task_id).first()
+        
+        if not video or not task:
+            logger.error(f"Video or task not found for greenscreen creation: {video_id}, {task_id}")
+            return
+            
+        # Create temporary files for greenscreen output
         temp_greenscreen = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4')
         temp_files.append(temp_greenscreen.name)
         
+        # Create greenscreen video
         create_greenscreen_video(
-            original_video_path=process_video_path.name,
-            mask_video_path=upload_path,
+            original_video_path=original_video_path,
+            mask_video_path=mask_video_path,
             output_path=temp_greenscreen.name
         )
         
-        # Convert green screen video to H.264
+        # Convert to H.264
         temp_greenscreen_h264 = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4')
         temp_files.append(temp_greenscreen_h264.name)
         convert_to_h264(temp_greenscreen.name, temp_greenscreen_h264.name)
         
-        # Upload green screen video to S3
+        # Upload to S3
         greenscreen_key = f"greenscreen/{video_id}_greenscreen.mp4"
         s3_client.upload_file(
             temp_greenscreen_h264.name,
@@ -200,7 +257,7 @@ async def process_video_masks(
             ExtraArgs={'ContentType': 'video/mp4'}
         )
         
-        # Update video_keys in the video record
+        # Update video record
         if video.video_keys is None:
             video.video_keys = {}
         
@@ -208,30 +265,29 @@ async def process_video_masks(
             **video.video_keys,
             'greenscreen': greenscreen_key
         }
+        
         # Update task status
-        task.status = "completed greenscreen"
+        task.status = "completed"
         task.completed_at = datetime.utcnow()
         db.commit()
-
+        
+        logger.info(f"Greenscreen video created and uploaded: {greenscreen_key}")
+        
     except Exception as e:
-        logger.error(f"Error occurred: {str(e)}")
-        if task:
+        logger.error(f"Error in greenscreen creation: {str(e)}")
+        if task and db:
             task.status = "failed"
-            task.error_message = str(e)
+            task.error_message = f"Mask generation succeeded but greenscreen failed: {str(e)}"
             db.commit()
-        raise
     finally:
-        inference_manager.cleanup()  # Clean up GPU resources
-        db.close()
+        if db:
+            db.close()
         # Clean up temporary files
         for temp_file in temp_files:
             try:
                 os.unlink(temp_file)
             except Exception as e:
                 logger.error(f"Error removing temporary file {temp_file}: {str(e)}")
-        
-        if db:
-            db.close()
 
 async def transcode_video(
     input_path: str,

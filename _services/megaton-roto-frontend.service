@@ -18,8 +18,8 @@ StartLimitBurst=0
 [Install]
 WantedBy=multi-user.target
 
-# sudo cp /home/ec2-user/megaton-roto/_services/megaton-roto-frontend.service /etc/systemd/system/megaton-frontend.service
+# sudo cp /home/ec2-user/megaton-roto-dev/_services/megaton-roto-frontend.service /etc/systemd/system/megaton-roto-frontend.service
 # sudo systemctl daemon-reload
-#sudo systemctl restart megaton-frontend
-#sudo systemctl status megaton-frontend
-#sudo journalctl -u megaton-frontend -f
+#sudo systemctl restart megaton-roto-frontend
+#sudo systemctl status megaton-roto-frontend
+#sudo journalctl -u megaton-roto-frontend -f
