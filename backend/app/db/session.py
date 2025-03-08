@@ -161,6 +161,27 @@ def add_columns():
             EXCEPTION
                 WHEN duplicate_column THEN NULL;
             END;
+            
+            -- Refresh tokens table
+            BEGIN
+                CREATE TABLE IF NOT EXISTS refresh_tokens (
+                    id VARCHAR PRIMARY KEY,
+                    user_id VARCHAR NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    token VARCHAR NOT NULL UNIQUE,
+                    expires_at TIMESTAMP NOT NULL,
+                    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    used BOOLEAN NOT NULL DEFAULT FALSE
+                );
+            EXCEPTION
+                WHEN duplicate_table THEN NULL;
+            END;
+            
+            -- Add index on token if not exists
+            BEGIN
+                CREATE INDEX IF NOT EXISTS ix_refresh_tokens_token ON refresh_tokens (token);
+            EXCEPTION
+                WHEN duplicate_table THEN NULL;
+            END;
         END $$;
         """)
 

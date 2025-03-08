@@ -39,8 +39,12 @@ interface AnnotationLayerProps {
   onPointsChange: (points: Point[]) => void;
   onPointClick: (point: Point, index: number) => void;
   className?: string;
+  annotation: FrameAnnotation;
   forceRedrawRef: MutableRefObject<(() => void) | undefined>;
   redrawTrigger: number;
+  getCurrentFrame: () => number;
+  onBboxDragStart: () => void;
+  onBboxDragEnd: () => void;
 }
 
 interface UploadResponse {
@@ -109,9 +113,12 @@ const AnnotationLayer = ({
   onBboxChange,
   onPointsChange,
   onPointClick,
+  annotation,
   className,
   forceRedrawRef,
-  redrawTrigger
+  redrawTrigger,
+  onBboxDragStart,
+  onBboxDragEnd
 }: AnnotationLayerProps) => {
   //console.log('=== AnnotationLayer Render ===');
   //console.log('Received bbox prop:', bbox);
@@ -144,15 +151,19 @@ const AnnotationLayer = ({
     const x = (e.clientX - rect.left) * (videoWidth / rect.width);
     const y = (e.clientY - rect.top) * (videoHeight / rect.height);
 
-    // Get current frame information (you need to track this)
-    const currentFrame = getCurrentFrame(); // You need to implement this function
+    // Get current frame information
+    const currentFrame = getCurrentFrame();
+    console.log('Current Points on Click:', points);
+    // Ensure points is an array before using findIndex
+    const pointsArray = Array.isArray(points) ? points : [];
 
     if (drawMode === 'bbox') {
       startPoint.current = { x, y };
       setIsDrawing(true);
+      onBboxDragStart && onBboxDragStart();
     } else if (drawMode === 'points') {
       // console.log('Drawing points', console.log(points));
-      const pointIndex = points.findIndex(point => {
+      const pointIndex = pointsArray.findIndex(point => {
         const dx = point.x - x;
         const dy = point.y - y;
         return Math.sqrt(dx * dx + dy * dy) < 5;
@@ -160,14 +171,14 @@ const AnnotationLayer = ({
       setHoveredPointIndex(pointIndex);
 
       if (pointIndex !== -1) {
-        const newPoints = points.filter((_, i) => i !== pointIndex);
+        const newPoints = pointsArray.filter((_, i) => i !== pointIndex);
         onPointsChange(newPoints);
       } else {
         const newPoint = { x, y, type: pointType };
-        onPointsChange([...points, newPoint]);
+        onPointsChange([...pointsArray, newPoint]);
       }
     }
-  }, [drawMode, pointType, points, onPointsChange, videoWidth, videoHeight]);
+  }, [drawMode, pointType, points, onPointsChange, videoWidth, videoHeight, onBboxDragStart]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
@@ -188,6 +199,8 @@ const AnnotationLayer = ({
       onBboxChange(newBbox);
       needsRedraw.current = true;
     }
+
+    console.log('Points on Move:', points);
 
     const pointIndex = points.findIndex(point => {
       const dx = point.x - x;
@@ -255,6 +268,10 @@ const AnnotationLayer = ({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
+    // Debug the current frame and annotation data
+    const currentFrame = getCurrentFrame();
+    console.log('Drawing points for frame:', currentFrame, points, annotation);
+
     const rect = canvas.getBoundingClientRect();
     const scaleX = rect.width / videoWidth;
     const scaleY = rect.height / videoHeight;
@@ -264,7 +281,10 @@ const AnnotationLayer = ({
     // Draw bbox
     const bboxToDraw = localBbox || bbox;
     if (bboxToDraw) {
-      const [x, y, w, h] = Array.isArray(bboxToDraw) ? bboxToDraw : [bboxToDraw.x, bboxToDraw.y, bboxToDraw.w, bboxToDraw.h];
+      // Handle both array and object formats for bbox
+      const [x, y, w, h] = Array.isArray(bboxToDraw)
+        ? bboxToDraw
+        : [bboxToDraw.x, bboxToDraw.y, bboxToDraw.w, bboxToDraw.h];
 
       // Only proceed if we have valid dimensions
       if (w > 0 && h > 0) {
@@ -281,34 +301,24 @@ const AnnotationLayer = ({
       }
     }
 
-    console.log('Drawing points:', points);
+    // Ensure points is always an array
+    let pointsToRender = [];
 
-    // Convert points from {positive: [], negative: []} format to [{x, y, type}] format
-    // TO DO: Deprecate this once backend is standardized. 
-    if (points && typeof points === 'object' && ('positive' in points || 'negative' in points)) {
-      const formattedPoints = [];
+    if (Array.isArray(points)) {
+      pointsToRender = points;
+    } else {
+      // If points is not an array, log the issue and use an empty array
+      console.error('Points is not an array:', points, typeof points);
 
-      if (points.positive) {
-        formattedPoints.push(...points.positive.map(point => ({
-          x: point[0],
-          y: point[1],
-          type: 'positive'
-        })));
+      // Try to get points from annotation if available
+      if (annotation && annotation[currentFrame] && Array.isArray(annotation[currentFrame].points)) {
+        console.log('Using points from annotation instead');
+        pointsToRender = annotation[currentFrame].points;
       }
-
-      if (points.negative) {
-        formattedPoints.push(...points.negative.map(point => ({
-          x: point[0],
-          y: point[1],
-          type: 'negative'
-        })));
-      }
-
-      points = formattedPoints;
     }
 
     // Draw points
-    points.forEach((point, index) => {
+    pointsToRender.forEach((point, index) => {
       const canvasX = point.x * scaleX;
       const canvasY = point.y * scaleY;
 
@@ -354,7 +364,7 @@ const AnnotationLayer = ({
     });
 
     needsRedraw.current = false;
-  }, [points, localBbox, bbox, hoveredPointIndex, videoWidth, videoHeight]);
+  }, [points, localBbox, bbox, hoveredPointIndex, videoWidth, videoHeight, annotation, getCurrentFrame]);
 
   // Animation and redraw effects
   useEffect(() => {
@@ -410,8 +420,9 @@ export const VideoUpload = ({ onUploadSuccess, fetchVideos, initialVideo, fps }:
   const [maskVideoUrl, setMaskVideoUrl] = useState<string | null>(null);
   const [drawMode, setDrawMode] = useState<'bbox' | 'points'>('bbox');
   const [pointType, setPointType] = useState<'positive' | 'negative'>('positive');
-  const [bbox, setBbox] = useState<BBox | null>(initialVideo?.bbox || null);
-  const [points, setPoints] = useState<Point[]>(initialVideo?.points || []);
+  const [annotation, setAnnotation] = useState<FrameAnnotation[]>(initialVideo?.annotation || []);
+  const [bbox, setBbox] = useState<BBox | null>(initialVideo?.bbox || (annotation[0]?.bbox || null));
+  const [points, setPoints] = useState<Point[]>(initialVideo?.points || (annotation[0]?.points || []));
   const [pointHistory, setPointHistory] = useState<Point[][]>([]);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [videoDimensions, setVideoDimensions] = useState({ width: 0, height: 0 });
@@ -442,7 +453,7 @@ export const VideoUpload = ({ onUploadSuccess, fetchVideos, initialVideo, fps }:
   const [duration, setDuration] = useState(0);
   const [isPolling, setIsPolling] = useState(false);
   const [pollCount, setPollCount] = useState(0);
-  const [annotation, setAnnotation] = useState<FrameAnnotation[]>(initialVideo?.annotation || []);
+  const [isDraggingBbox, setIsDraggingBbox] = useState(false);
 
   const MAX_POLLS = 300; // Safety limit (5 minutes at 1 second intervals)
 
@@ -600,20 +611,56 @@ export const VideoUpload = ({ onUploadSuccess, fetchVideos, initialVideo, fps }:
     }
   }, [points, saveChanges, initialVideo?.id]);
 
-  // In main VideoUpload component
+  // Create a debounced save function (outside of any other functions)
+  const debouncedSaveChanges = useMemo(
+    () => debounce((frame: number, newBbox: BBox | null, newPoints: Point[]) => {
+      console.log('Debounced save triggered');
+      saveChanges(newPoints, newBbox, undefined, frame);
+    }, 500),
+    []
+  );
+
+  // Modify your handleBboxChange function
   const handleBboxChange = useCallback((newBbox: BBox | null) => {
     console.log('handleBboxChange called with:', newBbox);
-    setBbox(newBbox);
-    // Get current frame when setting bbox
-    const video = videoRef.current;
-    const currentFrame = getCurrentFrame();
-    console.log('Setting bbox at frame:', currentFrame);
+    const frame = getCurrentFrame();
 
-    if (initialVideo?.id && newBbox) {  // Only save if we have both video ID and valid bbox
-      console.log('Triggering saveChanges with new bbox');
-      saveChanges(undefined, newBbox, undefined, currentFrame);
-    }
-  }, [saveChanges, initialVideo?.id, getCurrentFrame]);
+    // Update local state immediately for responsive UI
+    setBbox(newBbox);
+
+    // Update the annotation for the current frame
+    setAnnotation(prev => {
+      const newAnnotation = { ...prev };
+      if (!newAnnotation[frame]) {
+        newAnnotation[frame] = {
+          points: [],
+          bbox: null,
+          mask_data: null
+        };
+      }
+      newAnnotation[frame].bbox = newBbox;
+      return newAnnotation;
+    });
+
+    console.log('Setting bbox at frame:', frame);
+
+    // Use the debounced save instead of immediate save
+    debouncedSaveChanges(frame, newBbox, points);
+
+  }, [getCurrentFrame, points, debouncedSaveChanges]);
+
+  // Add these handlers to your AnnotationLayer component
+  const handleBboxDragStart = useCallback(() => {
+    setIsDraggingBbox(true);
+  }, []);
+
+  const handleBboxDragEnd = useCallback(() => {
+    setIsDraggingBbox(false);
+    // Force a final save when dragging ends
+    const frame = getCurrentFrame();
+    saveChanges(points, bbox, undefined, frame);
+  }, [getCurrentFrame, bbox, points]);
+
   // Add this new function
   const handleAnnotationClick = useCallback((annotation: FrameAnnotation) => {
     const currentFrame = getCurrentFrame();
@@ -797,12 +844,29 @@ export const VideoUpload = ({ onUploadSuccess, fetchVideos, initialVideo, fps }:
       setVideoUrl(initialVideo.videoUrl);
       setMaskVideoUrl(initialVideo.maskUrl || null);
       setGreenscreenUrl(initialVideo.greenscreenUrl || null);
-      // Only set bbox if it's different from current
-      if (initialVideo.bbox && JSON.stringify(initialVideo.bbox) !== JSON.stringify(bbox)) {
-        console.log('Setting bbox from initialVideo:', initialVideo.bbox);
-        setBbox(initialVideo.annotation.bbox);
+
+      // Check if annotation exists
+      if (initialVideo.annotation) {
+        // Set the full annotation object
+        setAnnotation(initialVideo.annotation);
+
+        // Get the first frame (or frame 0 if it exists)
+        const frameKey = initialVideo.annotation["0"] ? "0" : Object.keys(initialVideo.annotation)[0];
+
+        if (frameKey) {
+          // Only set bbox if it's different from current
+          if (initialVideo.annotation[frameKey]?.bbox &&
+            JSON.stringify(initialVideo.annotation[frameKey].bbox) !== JSON.stringify(bbox)) {
+            console.log('Setting bbox from initialVideo:', initialVideo.annotation[frameKey].bbox);
+            setBbox(initialVideo.annotation[frameKey].bbox);
+          }
+
+          // Set points from the frame
+          if (initialVideo.annotation[frameKey]?.points) {
+            setPoints(initialVideo.annotation[frameKey].points || []);
+          }
+        }
       }
-      setPoints(initialVideo.annotation.points || []);
     }
   }, [initialVideo]); // Remove bbox from dependencies
 
@@ -1315,7 +1379,7 @@ export const VideoUpload = ({ onUploadSuccess, fetchVideos, initialVideo, fps }:
 
               {maskData && !videoStore.getInstance(MAIN_VIDEO_ID)?.isPlaying && (
                 <MaskOverlay
-                  maskData={annotation.mask_data}
+                  maskData={annotation[getCurrentFrame()]?.mask_data}
                   videoWidth={videoDimensions.width}
                   videoHeight={videoDimensions.height}
                   className="absolute top-0 left-0 w-full h-full"
@@ -1330,12 +1394,18 @@ export const VideoUpload = ({ onUploadSuccess, fetchVideos, initialVideo, fps }:
                   videoHeight={videoDimensions.height}
                   drawMode={drawMode}
                   pointType={pointType}
-                  points={annotation.points}
-                  bbox={annotation.bbox}
+                  annotation={annotation}
+                  points={annotation[getCurrentFrame()]?.points || []}
+                  bbox={annotation[getCurrentFrame()]?.bbox || null}
                   onPointsChange={handlePointsChange}
                   onBboxChange={handleBboxChange}
                   onPointClick={handlePointInteraction}
+                  onBboxDragStart={handleBboxDragStart}
+                  onBboxDragEnd={handleBboxDragEnd}
                   getCurrentFrame={getCurrentFrame}
+                  forceRedrawRef={forceRedrawRef}
+                  redrawTrigger={redrawTrigger}
+                  className="absolute top-0 left-0 w-full h-full"
                 />
               )}
             </div>
@@ -1564,7 +1634,7 @@ export const VideoUpload = ({ onUploadSuccess, fetchVideos, initialVideo, fps }:
                   <span className="tooltip">Generate Masks</span>
                 </button>
                 <button
-                  onClick={() => console.log('Current Points:', points, points.length)}
+                  onClick={() => console.log('Current Points:', points, points.length, 'Annotation:', annotation)}
                   className="flex items-center gap-2 px-3 py-1.5 rounded-full transition-colors text-sm tooltip-wrapper
                     border border-[var(--border-color)] text-[var(--text-secondary)] hover:border-[var(--accent-purple)] hover:text-[var(--accent-purple)]"
                 >

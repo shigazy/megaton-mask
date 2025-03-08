@@ -4,6 +4,7 @@ import { useState } from 'react';
 import axios from 'axios';
 import { FaSignInAlt, FaUserPlus } from 'react-icons/fa';
 import Image from 'next/image';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -12,6 +13,7 @@ interface AuthModalProps {
 }
 
 export const AuthModal = ({ isOpen, onClose, embedded = false }: AuthModalProps) => {
+  const { login } = useAuth();
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -59,13 +61,26 @@ export const AuthModal = ({ isOpen, onClose, embedded = false }: AuthModalProps)
         return;
       }
 
-      console.log('Setting local storage...');
-      localStorage.setItem('token', response.data.access_token);
-      localStorage.setItem('user', JSON.stringify(response.data.user));
+      if (isLogin) {
+        // Use the auth context login function to handle token storage and state
+        await login(
+          response.data.access_token,
+          response.data.refresh_token,
+          response.data.user
+        );
+        console.log('Logged in successfully');
+      } else {
+        // For registration, we don't get tokens yet as email confirmation is required
+        console.log('Registered successfully, confirmation required');
+      }
 
-      console.log('Closing modal and reloading...');
+      console.log('Closing modal...');
       onClose();
-      window.location.reload();
+
+      // Only reload if we were logging in and succeeded
+      if (isLogin) {
+        window.location.reload();
+      }
 
     } catch (err: any) {
       console.error('Auth error:', err);

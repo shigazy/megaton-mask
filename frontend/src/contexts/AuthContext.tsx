@@ -20,7 +20,7 @@ interface User {
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
-  login: (token: string, user: User) => void;
+  login: (token: string, refreshToken: string, user: User) => void;
   logout: () => void;
 }
 
@@ -29,6 +29,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [refreshingToken, setRefreshingToken] = useState(false);
 
   const fetchUserProfile = async (token: string) => {
     try {
@@ -51,6 +52,48 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.error('Error fetching user profile:', error);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // Function to refresh token
+  const refreshToken = async () => {
+    try {
+      setRefreshingToken(true);
+      const storedRefreshToken = localStorage.getItem('refreshToken');
+
+      if (!storedRefreshToken) {
+        throw new Error('No refresh token found');
+      }
+
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/refresh`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ refresh_token: storedRefreshToken }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to refresh token');
+      }
+
+      const data = await response.json();
+
+      // Update tokens in storage
+      localStorage.setItem('token', data.access_token);
+      localStorage.setItem('refreshToken', data.refresh_token);
+
+      // Update axios header
+      axios.defaults.headers.common['Authorization'] = `Bearer ${data.access_token}`;
+
+      return data.access_token;
+    } catch (error) {
+      console.error('Error refreshing token:', error);
+      // Clear auth data on refresh failure
+      logout();
+      throw error;
+    } finally {
+      setRefreshingToken(false);
     }
   };
 
@@ -78,8 +121,46 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     initializeAuth();
   }, []);
 
-  const login = async (token: string, initialUser: User) => {
+  // Setup axios interceptor to handle 401 responses
+  useEffect(() => {
+    const interceptor = axios.interceptors.response.use(
+      (response) => response,
+      async (error) => {
+        const originalRequest = error.config;
+
+        // If error is 401 and we haven't already tried to refresh
+        if (error.response?.status === 401 && !originalRequest._retry && !refreshingToken) {
+          originalRequest._retry = true;
+
+          try {
+            // Try to refresh the token
+            const newToken = await refreshToken();
+
+            // Update the original request with new token
+            originalRequest.headers['Authorization'] = `Bearer ${newToken}`;
+
+            // Retry the original request
+            return axios(originalRequest);
+          } catch (refreshError) {
+            // If refresh fails, pass through to the next error handler
+            return Promise.reject(refreshError);
+          }
+        }
+
+        // For other errors, just pass them through
+        return Promise.reject(error);
+      }
+    );
+
+    // Clean up interceptor on unmount
+    return () => {
+      axios.interceptors.response.eject(interceptor);
+    };
+  }, [refreshingToken]);
+
+  const login = async (token: string, refreshToken: string, initialUser: User) => {
     localStorage.setItem('token', token);
+    localStorage.setItem('refreshToken', refreshToken);
     localStorage.setItem('user', JSON.stringify(initialUser));
     axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
     setUser(initialUser);
@@ -89,6 +170,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = () => {
     localStorage.removeItem('token');
+    localStorage.removeItem('refreshToken');
     localStorage.removeItem('user');
     delete axios.defaults.headers.common['Authorization'];
     setUser(null);

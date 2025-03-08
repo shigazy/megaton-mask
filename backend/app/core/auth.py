@@ -7,7 +7,8 @@ from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 from app.core.config import get_settings
 from app.db.session import get_db
-from app.models import User
+from app.models import User, RefreshToken
+import uuid
 
 settings = get_settings()
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -27,6 +28,48 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None):
         expire = datetime.utcnow() + timedelta(minutes=15)
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, settings.JWT_SECRET_KEY, algorithm=settings.ALGORITHM)
+
+def create_refresh_token(user_id: str, db: Session) -> str:
+    """Create a new refresh token and store it in the database"""
+    # Generate a secure token
+    token_value = str(uuid.uuid4())
+    
+    # Calculate expiration (30 days)
+    expires_at = datetime.utcnow() + timedelta(days=30)
+    
+    # Store in database
+    db_token = RefreshToken(
+        user_id=user_id,
+        token=token_value,
+        expires_at=expires_at
+    )
+    db.add(db_token)
+    db.commit()
+    
+    return token_value
+
+def validate_refresh_token(token: str, db: Session) -> Optional[str]:
+    """Validate a refresh token and return the user_id if valid"""
+    # Find token in database
+    db_token = db.query(RefreshToken).filter(
+        RefreshToken.token == token,
+        RefreshToken.expires_at > datetime.utcnow(),
+        RefreshToken.used == False
+    ).first()
+    
+    if not db_token:
+        return None
+    
+    return db_token.user_id
+
+def invalidate_refresh_token(token: str, db: Session) -> bool:
+    """Mark a refresh token as used"""
+    db_token = db.query(RefreshToken).filter(RefreshToken.token == token).first()
+    if db_token:
+        db_token.used = True
+        db.commit()
+        return True
+    return False
 
 async def get_current_user(
     token: str = Depends(oauth2_scheme),

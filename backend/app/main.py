@@ -5,7 +5,7 @@ logging.getLogger('urllib3').setLevel(logging.ERROR)
 logging.getLogger('s3transfer').setLevel(logging.ERROR)
 
 
-from fastapi import FastAPI, File, UploadFile, HTTPException, Depends, status, Form, Body, Request
+from fastapi import FastAPI, File, UploadFile, HTTPException, Depends, status, Form, Body, Request, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import boto3
@@ -15,13 +15,13 @@ from app.core.config import get_settings
 import logging
 from sqlalchemy.orm import Session
 from fastapi.security import OAuth2PasswordRequestForm
-from app.core.auth import create_access_token, get_current_user, get_password_hash, verify_password
-from app.models import User, Video, Task, AdminAction
+from app.core.auth import create_access_token, get_current_user, get_password_hash, verify_password, create_refresh_token, validate_refresh_token, invalidate_refresh_token
+from app.models import User, Video, Task, AdminAction, GlobalConfig
 from app.db.session import get_db, SessionLocal
 from fastapi.middleware import Middleware
 from slowapi import Limiter
 from slowapi.util import get_remote_address
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, validator, Field
 from datetime import timedelta, datetime
 from PIL import Image
 import cv2
@@ -30,7 +30,7 @@ import numpy as np
 import tempfile
 import os
 from inference.scripts.mask_generator import generate_single_mask
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Any
 from fastapi import BackgroundTasks
 from app.tasks import process_video_masks, process_uploaded_video
 from inference.manager import inference_manager
@@ -42,6 +42,7 @@ from app.api.stripe.routes import router as stripe_router
 from fastapi_mail import FastMail, MessageSchema, ConnectionConfig
 import jwt
 from passlib.context import CryptContext
+from decimal import Decimal
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG)
@@ -142,6 +143,9 @@ class UserResponse(BaseModel):
     super_user: bool
     storage_used: dict
 
+class RefreshRequest(BaseModel):
+    refresh_token: str
+
 # Email configuration
 mail_config = ConnectionConfig(
     MAIL_USERNAME=settings.MAIL_USERNAME,
@@ -235,14 +239,20 @@ async def login(
         data={"sub": user.id}
     )
     
+    # Generate refresh token
+    refresh_token = create_refresh_token(user.id, db)
+    
     return {
         "access_token": access_token,
+        "refresh_token": refresh_token,
         "token_type": "bearer",
         "user": {
-            "id": user.id, 
+            "id": user.id,
             "email": user.email,
             "super_user": user.super_user,
-            "is_confirmed": user.is_confirmed
+            "membership": user.membership,
+            "user_credits": user.user_credits,
+            "storage_used": user.storage_used
         }
     }
 
@@ -1152,3 +1162,45 @@ async def db_session_middleware(request: Request, call_next):
 
 # Mount the stripe routes
 app.include_router(stripe_router, prefix="/api/stripe", tags=["stripe"])
+
+@app.post("/api/auth/refresh")
+async def refresh_token(
+    refresh_data: RefreshRequest,
+    db: Session = Depends(get_db)
+):
+    # Validate the refresh token
+    user_id = validate_refresh_token(refresh_data.refresh_token, db)
+    if not user_id:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid or expired refresh token"
+        )
+    
+    # Get the user
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(
+            status_code=401,
+            detail="User not found"
+        )
+    
+    # Invalidate the old refresh token
+    invalidate_refresh_token(refresh_data.refresh_token, db)
+    
+    # Create new tokens
+    access_token = create_access_token(data={"sub": user.id})
+    new_refresh_token = create_refresh_token(user.id, db)
+    
+    return {
+        "access_token": access_token,
+        "refresh_token": new_refresh_token,
+        "token_type": "bearer",
+        "user": {
+            "id": user.id,
+            "email": user.email,
+            "super_user": user.super_user,
+            "membership": user.membership,
+            "user_credits": user.user_credits,
+            "storage_used": user.storage_used
+        }
+    }

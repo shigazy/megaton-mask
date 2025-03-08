@@ -2,6 +2,7 @@ from sqlalchemy import Column, String, DateTime, ForeignKey, JSON, Integer, Bool
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from datetime import datetime
+import uuid
 
 
 # IMPORTANT: When adding new columns to any table, remember to update the add_columns() function
@@ -47,6 +48,8 @@ class User(Base):
         },
         "last_updated": None
     })
+    # Add relationship to refresh tokens
+    refresh_tokens = relationship("RefreshToken", back_populates="user", cascade="all, delete-orphan")
 
 class Video(Base):
     __tablename__ = "videos"
@@ -98,3 +101,15 @@ class GlobalConfig(Base):
     key = Column(String, primary_key=True)
     value = Column(Float)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+class RefreshToken(Base):
+    __tablename__ = "refresh_tokens"
+    
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"))
+    token = Column(String, unique=True, index=True)
+    expires_at = Column(DateTime)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    used = Column(Boolean, default=False)
+    
+    user = relationship("User", back_populates="refresh_tokens")
