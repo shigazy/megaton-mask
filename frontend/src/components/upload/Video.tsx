@@ -75,9 +75,11 @@ interface VideoMetadata {
 }
 
 interface FrameAnnotation {
-  frame: number;
-  points: Point[];
-  bbox: BBox | null;
+  [currentFrame: number]: {
+    points: Point[];
+    bbox: BBox | null;
+    mask_data: MaskData | null;
+  };
 }
 
 declare global {
@@ -614,15 +616,19 @@ export const VideoUpload = ({ onUploadSuccess, fetchVideos, initialVideo, fps }:
   }, [saveChanges, initialVideo?.id, getCurrentFrame]);
   // Add this new function
   const handleAnnotationClick = useCallback((annotation: FrameAnnotation) => {
-    console.log('Loading annotation from frame:', annotation.frame);
-
+    const currentFrame = getCurrentFrame();
+    console.log('Loading annotation from frame:', annotation[currentFrame]);
     // Set the bbox and points from the annotation
-    if (annotation.bbox) {
-      setBbox(annotation.bbox);
+    if (annotation[currentFrame]) {
+      setBbox(annotation[currentFrame].bbox || null);
+    } else {
+      setBbox(null);
     }
 
-    if (annotation.points && annotation.points.length > 0) {
-      setPoints(annotation.points);
+    if (annotation[currentFrame]?.points && annotation[currentFrame].points.length > 0) {
+      setPoints(annotation[currentFrame].points);
+    } else {
+      setPoints([]);
     }
 
     // Force redraw to show the loaded annotations
@@ -639,9 +645,9 @@ export const VideoUpload = ({ onUploadSuccess, fetchVideos, initialVideo, fps }:
       setPoints(previousPoints);
       // Update history
       setPointHistory(prev => prev.slice(0, -1));
-
+      const currentFrame = getCurrentFrame();
       // Immediately save changes with the new points
-      saveChanges(previousPoints, bbox, maskData);
+      saveChanges(previousPoints, bbox, maskData, currentFrame);
 
       // Force redraw if using AnnotationLayer
       if (forceRedrawRef.current) {
@@ -662,6 +668,8 @@ export const VideoUpload = ({ onUploadSuccess, fetchVideos, initialVideo, fps }:
     handlePointsChange(newPoints);
   }, [points, handlePointsChange]);
 
+  // Annotation Layer - IF not thing breaks, delete it since it's not being called
+  /*
   const annotationLayer = useMemo(() => (
     videoDimensions.width > 0 && (
       <AnnotationLayer
@@ -680,6 +688,7 @@ export const VideoUpload = ({ onUploadSuccess, fetchVideos, initialVideo, fps }:
       />
     )
   ), [videoDimensions, drawMode, pointType, handleBboxChange, handlePointsChange, handlePointInteraction, redrawTrigger]);
+  */
 
   const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -791,9 +800,9 @@ export const VideoUpload = ({ onUploadSuccess, fetchVideos, initialVideo, fps }:
       // Only set bbox if it's different from current
       if (initialVideo.bbox && JSON.stringify(initialVideo.bbox) !== JSON.stringify(bbox)) {
         console.log('Setting bbox from initialVideo:', initialVideo.bbox);
-        setBbox(initialVideo.bbox);
+        setBbox(initialVideo.annotation.bbox);
       }
-      setPoints(initialVideo.points || []);
+      setPoints(initialVideo.annotation.points || []);
     }
   }, [initialVideo]); // Remove bbox from dependencies
 
@@ -1306,7 +1315,7 @@ export const VideoUpload = ({ onUploadSuccess, fetchVideos, initialVideo, fps }:
 
               {maskData && !videoStore.getInstance(MAIN_VIDEO_ID)?.isPlaying && (
                 <MaskOverlay
-                  maskData={maskData}
+                  maskData={annotation.mask_data}
                   videoWidth={videoDimensions.width}
                   videoHeight={videoDimensions.height}
                   className="absolute top-0 left-0 w-full h-full"
@@ -1321,8 +1330,8 @@ export const VideoUpload = ({ onUploadSuccess, fetchVideos, initialVideo, fps }:
                   videoHeight={videoDimensions.height}
                   drawMode={drawMode}
                   pointType={pointType}
-                  points={points}
-                  bbox={bbox}
+                  points={annotation.points}
+                  bbox={annotation.bbox}
                   onPointsChange={handlePointsChange}
                   onBboxChange={handleBboxChange}
                   onPointClick={handlePointInteraction}
