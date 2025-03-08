@@ -101,12 +101,12 @@ class InferenceManager:
             print(f"Error initializing predictor: {e}")
             raise
 
-    async def generate_mask(self, video_path, points, bbox):
+    async def generate_mask(self, video_path, points, bbox, start_frame=0):
         """Generate preview mask using tiny model"""
-        print(f"generate_mask called with video_path: {video_path}")
+        print(f"generate_mask called with video_path: {video_path}, starting from frame: {start_frame}")
         
         # Check cache first
-        cache_key = f"{video_path}:{str(points)}:{str(bbox)}"
+        cache_key = f"{video_path}:{str(points)}:{str(bbox)}:{start_frame}"
         cached_result = self.cache.get(cache_key, None, None)
         if cached_result is not None:
             return cached_result
@@ -136,10 +136,10 @@ class InferenceManager:
                 points_array = np.array(all_points) if all_points else None
                 labels_array = np.array(all_labels) if all_points else None
 
-                # Generate mask
+                # Generate mask - now using the provided start_frame
                 frame_idx, obj_ids, masks = predictor.add_new_points_or_box(
                     self.current_state,
-                    frame_idx=0,
+                    frame_idx=start_frame,  # Use the provided start_frame instead of 0
                     obj_id=0,
                     points=points_array,
                     labels=labels_array,
@@ -213,11 +213,12 @@ class InferenceManager:
         video_path: str,
         points: Dict[str, List[List[float]]],
         bbox: List[float],
+        start_frame: int = 0,
         super_mode: bool = False,
         method: str = "default"
     ):
         """Generate full video masks using regular model"""
-        print(f"Starting full video mask generation: {video_path}")
+        print(f"Starting full video mask generation: {video_path} from frame {start_frame}")
         
         try:
             # Clear memory before starting
@@ -250,7 +251,7 @@ class InferenceManager:
             loop = asyncio.get_event_loop()
             result = await loop.run_in_executor(None, self._generate_masks,
                 predictor, video_path, points, bbox, super_mode, method,
-                total_frames, height, width, batch_size)
+                total_frames, height, width, batch_size, start_frame)
             
             print("Masks generation completed")
             self.log_memory_usage("After masks generation")
@@ -264,7 +265,7 @@ class InferenceManager:
             self.cleanup()
 
     def _generate_masks(self, predictor, video_path, points, bbox, super_mode, method,
-                       total_frames, height, width, batch_size=25):
+                       total_frames, height, width, batch_size=25, start_frame=0):
         """Non-async version of mask generation to run in thread pool"""
         try:
             # Start with clean memory
@@ -305,7 +306,7 @@ class InferenceManager:
                 # Initialize tracking
                 frame_idx, obj_ids, masks = predictor.add_new_points_or_box(
                     state,
-                    frame_idx=0,
+                    frame_idx=start_frame,
                     obj_id=0,
                     points=points_tensor,
                     labels=labels_tensor,

@@ -65,6 +65,7 @@ class Video(Base):
     forward_reverse_key = Column(String, nullable=True)
     video_metadata = Column(JSON, nullable=True)  # Store the metadata
     video_keys = Column(JSON, nullable=True)  # Store the keys
+    annotation = Column(JSON, nullable=True)  # Store the annotation
 
 class Task(Base):
     __tablename__ = "tasks"

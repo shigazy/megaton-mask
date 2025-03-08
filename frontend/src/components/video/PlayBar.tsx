@@ -3,12 +3,20 @@ import { FaPlay, FaPause, FaExpand } from 'react-icons/fa';
 import { IoMdVolumeHigh, IoMdVolumeOff } from 'react-icons/io';
 import { useVideoStore } from '@/store/videoStore';
 
+interface FrameAnnotation {
+    frame: number;
+    points?: Point[];
+    bbox?: BBox | null;
+}
+
 interface PlayBarProps {
     videoRef: React.RefObject<HTMLVideoElement>;
     videoId: string;
     onFullscreen?: () => void;
     className?: string;
     FPS?: number;
+    frameAnnotations?: FrameAnnotation[];
+    onAnnotationClick?: (annotation: FrameAnnotation) => void;
 }
 
 export const PlayBar: React.FC<PlayBarProps> = ({
@@ -17,21 +25,26 @@ export const PlayBar: React.FC<PlayBarProps> = ({
     onFullscreen,
     className = '',
     FPS = 24,
+    frameAnnotations = [],
+    onAnnotationClick,
 }) => {
     const videoStore = useVideoStore();
     const instance = videoStore.getInstance(videoId);
 
     // Register instance only once on mount
     useEffect(() => {
+        console.debug(`[PlayBar] Registering video instance for id: ${videoId}`);
         videoStore.registerInstance(videoId);
-        return () => videoStore.removeInstance(videoId);
-    }, [videoId]); // Remove videoStore from dependencies
+        return () => {
+            console.debug(`[PlayBar] Removing video instance for id: ${videoId}`);
+            videoStore.removeInstance(videoId);
+        };
+    }, [videoId]);
 
     // Memoize the update handlers
     const handleTimeUpdate = useCallback(() => {
         const video = videoRef.current;
         if (!video || isNaN(video.duration)) return;
-
         videoStore.setProgress(videoId, (video.currentTime / video.duration) * 100);
         videoStore.setCurrentTime(videoId, video.currentTime);
     }, [videoId, videoRef]);
@@ -54,6 +67,7 @@ export const PlayBar: React.FC<PlayBarProps> = ({
         const video = videoRef.current;
         if (!video || isNaN(video.duration)) return;
         videoStore.setDuration(videoId, video.duration);
+        console.debug(`[PlayBar] Duration set to ${video.duration} seconds`);
     }, [videoId, videoRef]);
 
     // Set up video event listeners
@@ -88,8 +102,10 @@ export const PlayBar: React.FC<PlayBarProps> = ({
         if (!video) return;
 
         if (video.paused) {
+            console.debug('[PlayBar] Playing video');
             video.play();
         } else {
+            console.debug('[PlayBar] Pausing video');
             video.pause();
         }
     };
@@ -98,7 +114,9 @@ export const PlayBar: React.FC<PlayBarProps> = ({
         const video = videoRef.current;
         if (!video) return;
         video.muted = !video.muted;
+        console.debug(`[PlayBar] Video muted: ${video.muted}`);
     };
+
 
     const handleSeek = (e: React.MouseEvent<HTMLDivElement>) => {
         const video = videoRef.current;
@@ -107,6 +125,20 @@ export const PlayBar: React.FC<PlayBarProps> = ({
         const rect = e.currentTarget.getBoundingClientRect();
         const percent = ((e.clientX - rect.left) / rect.width) * 100;
         video.currentTime = (percent / 100) * video.duration;
+        console.debug(`[PlayBar] Seek clicked at ${percent.toFixed(2)}% (Time: ${video.currentTime.toFixed(2)} sec)`);
+    };
+
+    // Add function to handle annotation marker clicks with logging
+    const handleAnnotationClick = (e: React.MouseEvent<HTMLDivElement>, annotation: FrameAnnotation) => {
+        e.stopPropagation(); // Prevent triggering the regular seek
+        const video = videoRef.current;
+        if (!video) return;
+        console.debug(`[PlayBar] Annotation marker clicked. Frame: ${annotation.frame}, Calculated time: ${(annotation.frame / FPS).toFixed(2)} seconds`);
+        // Seek to the appropriate time based on the frame
+        video.currentTime = annotation.frame / FPS;
+        if (onAnnotationClick) {
+            onAnnotationClick(annotation);
+        }
     };
 
     const formatTime = (seconds: number): string => {
@@ -124,13 +156,34 @@ export const PlayBar: React.FC<PlayBarProps> = ({
     return (
         <div className={`bg-gray-800 rounded-lg p-4 shadow-lg ${className}`}>
             <div
-                className="h-2 bg-gray-600 cursor-pointer w-full rounded-full overflow-hidden mb-3"
+                className="h-2 bg-gray-600 cursor-pointer w-full rounded-full overflow-hidden mb-3 relative"
                 onClick={handleSeek}
             >
                 <div
                     className="h-full bg-blue-500 transition-all duration-100"
                     style={{ width: `${instance.progress}%` }}
                 />
+
+                {/* Annotation markers */}
+                {frameAnnotations.map((annotation, index) => {
+                    // Calculate position as percentage of video duration
+                    const position = instance.duration > 0
+                        ? (annotation.frame / (FPS * instance.duration)) * 100
+                        : 0;
+                    console.debug(`[PlayBar] Rendering marker ${index} - Frame: ${annotation.frame}, Position: ${position.toFixed(2)}%`);
+                    return (
+                        <div
+                            key={`annotation-${index}`}
+                            className="absolute top-0 h-full w-1 bg-white cursor-pointer hover:bg-yellow-300"
+                            style={{
+                                left: `${position}%`,
+                                zIndex: 10,
+                            }}
+                            onClick={(e) => handleAnnotationClick(e, annotation)}
+                            title={`Frame ${annotation.frame}: ${annotation.bbox ? 'Box' : ''} ${annotation.points?.length ? 'Points' : ''}`}
+                        />
+                    );
+                })}
             </div>
 
             <div className="flex items-center justify-between">

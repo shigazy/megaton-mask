@@ -4,4 +4,7 @@ export interface Video {
     videoUrl: string;
     thumbnailUrl: string;
     createdAt: string;
+    bbox: Array<number>;
+    points: Array<number>;
+    mask_data: Array<number>;
 }

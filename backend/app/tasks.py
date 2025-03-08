@@ -63,7 +63,8 @@ async def process_video_masks(
     task_id: str,
     points: Optional[Dict[str, List[List[float]]]] = None,
     super: bool = False,
-    method: str = "default"
+    method: str = "default",
+    start_frame: int = 0
 ) -> None:
     """
     Process video masks using the optimized InferenceManager
@@ -122,7 +123,8 @@ async def process_video_masks(
             points=points,
             bbox=bbox,
             super_mode=super,
-            method=method
+            method=method,
+            start_frame=start_frame
         )
 
         # Memory optimization: Process masks in chunks to avoid OOM

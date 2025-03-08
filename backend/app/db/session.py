@@ -143,6 +143,12 @@ def add_columns():
                 WHEN duplicate_column THEN NULL;
             END;
             
+            BEGIN
+                ALTER TABLE videos ADD COLUMN IF NOT EXISTS annotation JSONB;
+            EXCEPTION
+                WHEN duplicate_column THEN NULL;
+            END;
+            
             -- Tasks table columns
             BEGIN
                 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS credit_cost FLOAT;

@@ -119,6 +119,7 @@ class GenerateMasksRequest(BaseModel):
     points: Dict[str, List[List[float]]]
     super: bool
     method: str
+    start_frame: int = 0  # Add start_frame with default value of 0
 
     class Config:
         arbitrary_types_allowed = True
@@ -485,6 +486,7 @@ async def generate_preview_mask(
     video_id: str,
     request_data: MaskGenerationRequest,
     background_tasks: BackgroundTasks,
+    start_frame: int = Body(0),  # Add start_frame parameter with default value
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -507,12 +509,14 @@ async def generate_preview_mask(
         print("request_data.bbox", request_data.bbox)
         print("request_data.points", request_data.points)
         print("video_path", video_path)
+        print("request_data.current_frame", request_data.current_frame)
 
         # Create the batch request data properly
         batch_request = {
             'video_path': video_path,
             'points': request_data.points,
-            'bbox': request_data.bbox
+            'bbox': request_data.bbox,
+            'current_frame': request_data.current_frame
         }
         
         print("Sending batch request:", batch_request)  # Debug print
@@ -566,7 +570,8 @@ async def generate_full_masks(
             bbox=body.get('bbox'),
             points=body.get('points'),
             super=body.get('super', False),
-            method=body.get('method', 'default')
+            method=body.get('method', 'default'),
+            start_frame=body.get('start_frame', 0)
         )
         print(f"Parsed request data: {request_data}")
         
@@ -639,7 +644,10 @@ async def generate_full_masks(
         logger.info(f"Adding task {task.id} to background processing")
         from app.tasks import process_video_masks
         print("Request data:")
+        
         print(request_data)
+        start_frame = request_data.start_frame
+        print("start_frame", start_frame)
 
         print("Adding task to background tasks...")
         background_tasks.add_task(
@@ -649,7 +657,8 @@ async def generate_full_masks(
             points=request_data.points,
             task_id=task.id,
             super=request_data.super,
-            method=request_data.method
+            method=request_data.method,
+            start_frame=start_frame
         )
         print("Task added to background tasks")
         

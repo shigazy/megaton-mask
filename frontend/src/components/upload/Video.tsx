@@ -74,6 +74,12 @@ interface VideoMetadata {
   upload_date: string;
 }
 
+interface FrameAnnotation {
+  frame: number;
+  points: Point[];
+  bbox: BBox | null;
+}
+
 declare global {
   namespace NodeJS {
     interface ProcessEnv {
@@ -97,6 +103,7 @@ const AnnotationLayer = ({
   pointType,
   points,
   bbox,
+  getCurrentFrame,
   onBboxChange,
   onPointsChange,
   onPointClick,
@@ -104,9 +111,9 @@ const AnnotationLayer = ({
   forceRedrawRef,
   redrawTrigger
 }: AnnotationLayerProps) => {
-  console.log('=== AnnotationLayer Render ===');
-  console.log('Received bbox prop:', bbox);
-  console.log('Current dimensions:', { videoWidth, videoHeight });
+  //console.log('=== AnnotationLayer Render ===');
+  //console.log('Received bbox prop:', bbox);
+  // console.log('Current dimensions:', { videoWidth, videoHeight });
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -117,18 +124,15 @@ const AnnotationLayer = ({
   const [localBbox, setLocalBbox] = useState<BBox | null>(bbox);
   const [hoveredPointIndex, setHoveredPointIndex] = useState<number | null>(null);
   const [scale, setScale] = useState({ x: 1, y: 1 });
-
+  const [frameAnnotations, setFrameAnnotations] = useState<FrameAnnotation[]>([]);
   // Update effect to prevent loops
   useEffect(() => {
     if (bbox && (!localBbox || JSON.stringify(bbox) !== JSON.stringify(localBbox))) {
-      console.log('Updating localBbox from bbox prop:', bbox);
+      // console.log('Updating localBbox from bbox prop:', bbox);
       setLocalBbox(bbox);
       needsRedraw.current = true;
     }
   }, [bbox]); // Only depend on bbox prop
-
-
-
 
   const handleMouseDown = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
@@ -138,11 +142,14 @@ const AnnotationLayer = ({
     const x = (e.clientX - rect.left) * (videoWidth / rect.width);
     const y = (e.clientY - rect.top) * (videoHeight / rect.height);
 
+    // Get current frame information (you need to track this)
+    const currentFrame = getCurrentFrame(); // You need to implement this function
+
     if (drawMode === 'bbox') {
       startPoint.current = { x, y };
       setIsDrawing(true);
     } else if (drawMode === 'points') {
-      console.log('Drawing points', console.log(points));
+      // console.log('Drawing points', console.log(points));
       const pointIndex = points.findIndex(point => {
         const dx = point.x - x;
         const dy = point.y - y;
@@ -392,7 +399,7 @@ const AnnotationLayer = ({
   );
 };
 
-export const VideoUpload = ({ onUploadSuccess, fetchVideos, initialVideo, setInitialVideo }: VideoUploadProps) => {
+export const VideoUpload = ({ onUploadSuccess, fetchVideos, initialVideo, fps }: VideoUploadProps) => {
   const { setStatus } = useStatus();
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -433,6 +440,8 @@ export const VideoUpload = ({ onUploadSuccess, fetchVideos, initialVideo, setIni
   const [duration, setDuration] = useState(0);
   const [isPolling, setIsPolling] = useState(false);
   const [pollCount, setPollCount] = useState(0);
+  const [annotation, setAnnotation] = useState<FrameAnnotation[]>(initialVideo?.annotation || []);
+
   const MAX_POLLS = 300; // Safety limit (5 minutes at 1 second intervals)
 
   const videoStore = useVideoStore();
@@ -499,12 +508,12 @@ export const VideoUpload = ({ onUploadSuccess, fetchVideos, initialVideo, setIni
       forceRedrawRef.current();
     }
   }, []);
-
-  // Define saveChanges with proper error handling and video ID check
+  // MODIFY EXISTING - Update the saveChanges function to include current frame
   const saveChanges = useCallback(async (
     newPoints?: Point[],
     newBbox?: BBox | null,
-    newMaskData?: ImageData | null
+    newMaskData?: ImageData | null,
+    currentFrame?: number
   ) => {
     if (!initialVideo?.id) return;
 
@@ -513,7 +522,7 @@ export const VideoUpload = ({ onUploadSuccess, fetchVideos, initialVideo, setIni
       const url = `${apiUrl}/api/videos/${initialVideo.id}`;
 
       // Ensure we're using the new bbox if provided
-      const bboxToSave = newBbox || bbox;
+      const bboxToSave = newBbox !== undefined ? newBbox : bbox;
       console.log('Preparing to save bbox:', bboxToSave);
 
       // Convert BBox to array format
@@ -524,7 +533,18 @@ export const VideoUpload = ({ onUploadSuccess, fetchVideos, initialVideo, setIni
         bboxToSave.h
       ] : null;
 
-      console.log('Sending bbox array to backend:', bboxArray);
+      // Calculate current frame if not provided
+      const frameToSave = currentFrame !== undefined ? currentFrame : getCurrentFrame();
+      console.log('Saving at frame:', frameToSave);
+
+      const annotationToSave = {
+        ...annotation,
+        [frameToSave]: {
+          points: newPoints || points,
+          bbox: bboxArray,
+          mask_data: newMaskData || maskData
+        },
+      }
 
       const response = await fetch(url, {
         method: 'PATCH',
@@ -535,9 +555,13 @@ export const VideoUpload = ({ onUploadSuccess, fetchVideos, initialVideo, setIni
         body: JSON.stringify({
           points: newPoints || points,
           bbox: bboxArray,
-          mask_data: newMaskData || maskData
+          mask_data: newMaskData || maskData,
+          current_frame: frameToSave,
+          annotation: annotationToSave
         })
       });
+
+      setAnnotation(annotationToSave);
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -552,12 +576,25 @@ export const VideoUpload = ({ onUploadSuccess, fetchVideos, initialVideo, setIni
     }
   }, [initialVideo?.id, points, bbox, maskData]);
 
+  const getCurrentFrame = useCallback((): number => {
+    const video = videoRef.current;
+    if (!video || isNaN(video.currentTime)) return 0;
+
+    // Get FPS from video metadata or use default
+    const fps = initialVideo?.video_metadata?.fps || DEFAULT_FPS;
+    return Math.floor(video.currentTime * fps);
+  }, [videoRef, initialVideo?.video_metadata?.fps]);
+
   // Update handlers to use the improved saveChanges
   const handlePointsChange = useCallback((newPoints: Point[]) => {
     setPointHistory(prev => [...prev, points]);
     setPoints(newPoints);
+    // Get current frame when setting points
+    const currentFrame = getCurrentFrame();
+    console.log('Setting points at frame:', currentFrame);
+
     if (initialVideo?.id) {  // Only save if we have a video ID
-      saveChanges(newPoints);
+      saveChanges(newPoints, undefined, undefined, currentFrame);
     }
   }, [points, saveChanges, initialVideo?.id]);
 
@@ -565,11 +602,32 @@ export const VideoUpload = ({ onUploadSuccess, fetchVideos, initialVideo, setIni
   const handleBboxChange = useCallback((newBbox: BBox | null) => {
     console.log('handleBboxChange called with:', newBbox);
     setBbox(newBbox);
+    // Get current frame when setting bbox
+    const video = videoRef.current;
+    const currentFrame = getCurrentFrame();
+    console.log('Setting bbox at frame:', currentFrame);
+
     if (initialVideo?.id && newBbox) {  // Only save if we have both video ID and valid bbox
       console.log('Triggering saveChanges with new bbox');
-      saveChanges(undefined, newBbox);
+      saveChanges(undefined, newBbox, undefined, currentFrame);
     }
-  }, [saveChanges, initialVideo?.id]);
+  }, [saveChanges, initialVideo?.id, getCurrentFrame]);
+  // Add this new function
+  const handleAnnotationClick = useCallback((annotation: FrameAnnotation) => {
+    console.log('Loading annotation from frame:', annotation.frame);
+
+    // Set the bbox and points from the annotation
+    if (annotation.bbox) {
+      setBbox(annotation.bbox);
+    }
+
+    if (annotation.points && annotation.points.length > 0) {
+      setPoints(annotation.points);
+    }
+
+    // Force redraw to show the loaded annotations
+    forceRedraw();
+  }, [forceRedraw]);
 
   const handleUndo = useCallback(() => {
     setStatus('Undoing last action...');
@@ -597,7 +655,7 @@ export const VideoUpload = ({ onUploadSuccess, fetchVideos, initialVideo, setIni
       });
     }
     setStatus('Action undone');
-  }, [pointHistory, bbox, maskData, saveChanges]);
+  }, [pointHistory, bbox, maskData, saveChanges, getCurrentFrame]);
 
   const handlePointInteraction = useCallback((point: Point, index: number) => {
     const newPoints = points.filter((_, i) => i !== index);
@@ -758,6 +816,8 @@ export const VideoUpload = ({ onUploadSuccess, fetchVideos, initialVideo, setIni
       console.log('=== Generate Preview Mask ===');
       console.log('Current Points:', currentPoints);
       console.log('Current BBox:', currentBbox);
+      const currentFrame = getCurrentFrame();
+      console.log('Generating preview mask at frame:', currentFrame);
 
       try {
         if (abortControllerRef.current) {
@@ -778,7 +838,8 @@ export const VideoUpload = ({ onUploadSuccess, fetchVideos, initialVideo, setIni
               .filter(p => p.type === 'negative')
               .map(p => [p.x, p.y])
           },
-          bbox: currentBbox
+          bbox: currentBbox,
+          current_frame: currentFrame
         };
 
         console.log('Sending request with data:', JSON.stringify(requestData, null, 2));
@@ -918,6 +979,9 @@ export const VideoUpload = ({ onUploadSuccess, fetchVideos, initialVideo, setIni
 
     if (!videoUrl || !bbox || !points.length) {
       console.log('Step 4: Missing required data, returning early');
+      if (!videoUrl) console.log('Missing videoUrl');
+      if (!bbox) console.log('Missing bbox');
+      if (!points.length) console.log('Missing points');
       setStatus('Missing required data for mask generation', 'error');
       return;
     }
@@ -934,6 +998,7 @@ export const VideoUpload = ({ onUploadSuccess, fetchVideos, initialVideo, setIni
 
       console.log('Step 6: Getting auth token');
       const token = localStorage.getItem('token');
+      const startFrame = getCurrentFrame();
 
       console.log('Step 7: Preparing request body');
       const requestBody = {
@@ -943,7 +1008,8 @@ export const VideoUpload = ({ onUploadSuccess, fetchVideos, initialVideo, setIni
           negative: points.filter(p => p.type === 'negative').map(p => [p.x, p.y])
         },
         super: superMasks,
-        method: method
+        method: method,
+        start_frame: startFrame
       };
       console.log('Step 8: Request body prepared:', requestBody);
 
@@ -1260,6 +1326,7 @@ export const VideoUpload = ({ onUploadSuccess, fetchVideos, initialVideo, setIni
                   onPointsChange={handlePointsChange}
                   onBboxChange={handleBboxChange}
                   onPointClick={handlePointInteraction}
+                  getCurrentFrame={getCurrentFrame}
                 />
               )}
             </div>
@@ -1285,11 +1352,13 @@ export const VideoUpload = ({ onUploadSuccess, fetchVideos, initialVideo, setIni
                   </div>
 
                   <PlayBar
-                    videoRef={maskVideoRef}
-                    videoId={MASK_VIDEO_ID}
-                    onFullscreen={() => maskVideoRef.current?.requestFullscreen()}
-                    FPS={getFPS(initialVideo)}
-                    className="border-t border-[var(--border-color)]"
+                    videoRef={videoRef}
+                    videoId={MAIN_VIDEO_ID}
+                    onFullscreen={() => videoRef.current?.requestFullscreen()}
+                    className="rounded-lg"
+                    FPS={videoMetadata?.fps || 30}
+                    frameAnnotations={frameAnnotations}  // Add this line
+                    onAnnotationClick={handleAnnotationClick}  // Add this line
                   />
 
                   <div className="p-2 border-t border-[var(--border-color)]">
