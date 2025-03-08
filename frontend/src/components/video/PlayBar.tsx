@@ -3,10 +3,24 @@ import { FaPlay, FaPause, FaExpand } from 'react-icons/fa';
 import { IoMdVolumeHigh, IoMdVolumeOff } from 'react-icons/io';
 import { useVideoStore } from '@/store/videoStore';
 
+interface Point {
+    x: number;
+    y: number;
+    type: 'positive' | 'negative';
+}
+
+interface AnnotationData {
+    [frame: string]: {
+        bbox: number[] | null;       // [x, y, width, height] as array
+        points: Point[] | null;
+        mask_data: any | null;
+    };
+}
+
 interface FrameAnnotation {
-    frame: number;
-    points?: Point[];
-    bbox?: BBox | null;
+    frame: number; // Index of the frame in the video
+    points?: Point[]; // Points for this frame index
+    bbox?: BBox | null; // Bounding box for this frame index
 }
 
 interface PlayBarProps {
@@ -17,6 +31,7 @@ interface PlayBarProps {
     FPS?: number;
     frameAnnotations?: FrameAnnotation[];
     onAnnotationClick?: (annotation: FrameAnnotation) => void;
+    annotation?: AnnotationData;
 }
 
 export const PlayBar: React.FC<PlayBarProps> = ({
@@ -27,6 +42,7 @@ export const PlayBar: React.FC<PlayBarProps> = ({
     FPS = 24,
     frameAnnotations = [],
     onAnnotationClick,
+    annotation = {},
 }) => {
     const videoStore = useVideoStore();
     const instance = videoStore.getInstance(videoId);
@@ -95,6 +111,15 @@ export const PlayBar: React.FC<PlayBarProps> = ({
         };
     }, [handleTimeUpdate, handlePlay, handlePause, handleVolumeChange, handleDurationChange]);
 
+    // Update this code inside your PlayBar component
+    useEffect(() => {
+        // Debug what annotation data we're receiving
+        console.log("Annotation data received:", annotation);
+        if (annotation) {
+            console.log("Number of frames with annotations:", Object.keys(annotation).length);
+        }
+    }, [annotation]);
+
     if (!instance) return null;
 
     const handlePlayPause = () => {
@@ -128,16 +153,22 @@ export const PlayBar: React.FC<PlayBarProps> = ({
         console.debug(`[PlayBar] Seek clicked at ${percent.toFixed(2)}% (Time: ${video.currentTime.toFixed(2)} sec)`);
     };
 
-    // Add function to handle annotation marker clicks with logging
-    const handleAnnotationClick = (e: React.MouseEvent<HTMLDivElement>, annotation: FrameAnnotation) => {
+    // Updated to handle frame numbers directly
+    const handleAnnotationClick = (e: React.MouseEvent<HTMLDivElement>, frame: number) => {
         e.stopPropagation(); // Prevent triggering the regular seek
         const video = videoRef.current;
         if (!video) return;
-        console.debug(`[PlayBar] Annotation marker clicked. Frame: ${annotation.frame}, Calculated time: ${(annotation.frame / FPS).toFixed(2)} seconds`);
-        // Seek to the appropriate time based on the frame
-        video.currentTime = annotation.frame / FPS;
-        if (onAnnotationClick) {
-            onAnnotationClick(annotation);
+
+        // Seek to the frame
+        video.currentTime = frame / FPS;
+        console.debug(`[PlayBar] Jumped to frame ${frame} (${(frame / FPS).toFixed(2)}s)`);
+
+        if (onAnnotationClick && annotation && annotation[frame]) {
+            onAnnotationClick({
+                frame,
+                points: annotation[frame].points || [],
+                bbox: annotation[frame].bbox || null
+            });
         }
     };
 
@@ -165,22 +196,71 @@ export const PlayBar: React.FC<PlayBarProps> = ({
                 />
 
                 {/* Annotation markers */}
-                {frameAnnotations.map((annotation, index) => {
+                {annotation && Object.keys(annotation).map((frameStr) => {
+                    const frame = parseInt(frameStr, 10);
+                    const frameData = annotation[frameStr];
+
+                    // Debug each frame's data
+                    console.log(`Frame ${frame} data:`, frameData);
+
+                    // Only show markers for frames that have annotations
+                    // IMPORTANT: Check the exact structure that your data has
+                    const hasBbox = frameData.bbox && (
+                        Array.isArray(frameData.bbox) ? frameData.bbox.length > 0 : true
+                    );
+                    const hasPoints = frameData.points && Array.isArray(frameData.points) && frameData.points.length > 0;
+
+                    // Skip frames without annotations
+                    if (!frameData || (!hasBbox && !hasPoints)) {
+                        console.log(`Skipping frame ${frame} - no valid annotations`);
+                        return null;
+                    }
+
                     // Calculate position as percentage of video duration
-                    const position = instance.duration > 0
-                        ? (annotation.frame / (FPS * instance.duration)) * 100
+                    const totalFrames = instance.duration ? Math.floor(instance.duration * FPS) : 0;
+                    console.log(`Total frames: ${totalFrames}, Current frame: ${frame}`);
+
+                    // THIS CALCULATION IS CRITICAL - adjust if markers aren't positioned correctly
+                    const position = totalFrames > 0
+                        ? (frame / totalFrames) * 100
                         : 0;
-                    console.debug(`[PlayBar] Rendering marker ${index} - Frame: ${annotation.frame}, Position: ${position.toFixed(2)}%`);
+
+                    console.log(`Frame ${frame} position: ${position.toFixed(2)}%`);
+
+                    // Skip markers that would be off-screen
+                    if (position < 0 || position > 100) {
+                        console.log(`Skipping frame ${frame} - position out of range (${position}%)`);
+                        return null;
+                    }
+
+                    // Choose color based on annotation type
+                    const markerColor = hasBbox && hasPoints
+                        ? 'bg-yellow-400' // Both box and points
+                        : hasBbox
+                            ? 'bg-blue-400'  // Only box
+                            : 'bg-green-400'; // Only points
+
+                    const tooltipText = `Frame ${frame}: ${hasBbox ? 'Box' : ''} ${hasPoints ? `${frameData.points.length} Points` : ''}`;
+
                     return (
                         <div
-                            key={`annotation-${index}`}
-                            className="absolute top-0 h-full w-1 bg-white cursor-pointer hover:bg-yellow-300"
+                            key={`annotation-${frame}`}
+                            className={`absolute top-0 h-full w-1 ${markerColor} hover:bg-white cursor-pointer`}
                             style={{
                                 left: `${position}%`,
-                                zIndex: 10,
+                                zIndex: 20, // Increased z-index to make sure markers are visible
                             }}
-                            onClick={(e) => handleAnnotationClick(e, annotation)}
-                            title={`Frame ${annotation.frame}: ${annotation.bbox ? 'Box' : ''} ${annotation.points?.length ? 'Points' : ''}`}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                const video = videoRef.current;
+                                if (!video) return;
+                                video.currentTime = frame / FPS;
+                                console.log(`Jumped to frame ${frame} (${(frame / FPS).toFixed(2)}s)`);
+                                if (onAnnotationClick) {
+                                    onAnnotationClick({ frame, points: frameData.points, bbox: frameData.bbox });
+                                }
+                            }}
+                            title={tooltipText}
                         />
                     );
                 })}

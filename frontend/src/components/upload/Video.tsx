@@ -200,7 +200,7 @@ const AnnotationLayer = ({
       needsRedraw.current = true;
     }
 
-    console.log('Points on Move:', points);
+    //console.log('Points on Move:', points);
 
     const pointIndex = points.findIndex(point => {
       const dx = point.x - x;
@@ -239,7 +239,7 @@ const AnnotationLayer = ({
 
     const updateCanvasSize = () => {
       const rect = canvas.getBoundingClientRect();
-      console.log('Setting canvas size:', rect);
+      // console.log('Setting canvas size:', rect);
       const dpr = window.devicePixelRatio || 1;
       canvas.width = rect.width * dpr;
       canvas.height = rect.height * dpr;
@@ -253,7 +253,7 @@ const AnnotationLayer = ({
 
     updateCanvasSize();
     const resizeObserver = new ResizeObserver(() => {
-      console.log('Canvas resized');
+      // console.log('Canvas resized');
       updateCanvasSize();
     });
     resizeObserver.observe(canvas);
@@ -270,7 +270,7 @@ const AnnotationLayer = ({
 
     // Debug the current frame and annotation data
     const currentFrame = getCurrentFrame();
-    console.log('Drawing points for frame:', currentFrame, points, annotation);
+    // console.log('Drawing points for frame:', currentFrame, points, annotation);
 
     const rect = canvas.getBoundingClientRect();
     const scaleX = rect.width / videoWidth;
@@ -517,7 +517,7 @@ export const VideoUpload = ({ onUploadSuccess, fetchVideos, initialVideo, fps }:
   // Create a function to force redraw that can be called from anywhere
   const forceRedraw = useCallback(() => {
     if (forceRedrawRef.current) {
-      console.log('Forcing canvas redraw...');
+      // console.log('Forcing canvas redraw...');
       forceRedrawRef.current();
     }
   }, []);
@@ -1436,7 +1436,7 @@ export const VideoUpload = ({ onUploadSuccess, fetchVideos, initialVideo, fps }:
                     onFullscreen={() => videoRef.current?.requestFullscreen()}
                     className="rounded-lg"
                     FPS={videoMetadata?.fps || 30}
-                    frameAnnotations={frameAnnotations}  // Add this line
+                    annotation={annotation}  // Add this line
                     onAnnotationClick={handleAnnotationClick}  // Add this line
                   />
 
@@ -1479,6 +1479,8 @@ export const VideoUpload = ({ onUploadSuccess, fetchVideos, initialVideo, fps }:
                     onFullscreen={() => greenscreenVideoRef.current?.requestFullscreen()}
                     FPS={getFPS(initialVideo)}
                     className="border-t border-[var(--border-color)]"
+                    annotation={annotation}
+                    onAnnotationClick={handleAnnotationClick}
                   />
 
                   <div className="p-2 border-t border-[var(--border-color)]">
@@ -1504,6 +1506,8 @@ export const VideoUpload = ({ onUploadSuccess, fetchVideos, initialVideo, fps }:
                   videoId={MAIN_VIDEO_ID}
                   onFullscreen={() => videoRef.current?.requestFullscreen()}
                   FPS={getFPS(initialVideo)}
+                  annotation={annotation}
+                  onAnnotationClick={handleAnnotationClick}
                 />
               </div>
 

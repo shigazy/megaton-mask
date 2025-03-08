@@ -65,7 +65,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw new Error('No refresh token found');
       }
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/refresh`, {
+      const response = await window.fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/refresh`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -96,6 +96,60 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setRefreshingToken(false);
     }
   };
+
+  // Setup fetch interceptor
+  useEffect(() => {
+    // Store the original fetch function
+    const originalFetch = window.fetch;
+
+    // Override the global fetch function
+    window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+      // Create a new init object to avoid modifying the original
+      const modifiedInit = init ? { ...init } : {};
+
+      // Add authorization header if a token exists
+      const token = localStorage.getItem('token');
+      if (token) {
+        modifiedInit.headers = {
+          ...modifiedInit.headers,
+          'Authorization': `Bearer ${token}`
+        };
+      }
+
+      // Make the initial fetch request
+      let response = await originalFetch(input, modifiedInit);
+
+      // If we get a 401 and we're not currently refreshing tokens and we have a refresh token
+      if (response.status === 401 && !refreshingToken && localStorage.getItem('refreshToken')) {
+        try {
+          // Try to refresh the token
+          const newToken = await refreshToken();
+
+          // Create new headers with the new token
+          const newInit = {
+            ...modifiedInit,
+            headers: {
+              ...modifiedInit.headers,
+              'Authorization': `Bearer ${newToken}`
+            }
+          };
+
+          // Retry the request with the new token
+          response = await originalFetch(input, newInit);
+        } catch (error) {
+          console.error('Error refreshing token for fetch:', error);
+          // Let the 401 response pass through if refresh failed
+        }
+      }
+
+      return response;
+    };
+
+    // Cleanup function to restore original fetch
+    return () => {
+      window.fetch = originalFetch;
+    };
+  }, [refreshingToken]);
 
   useEffect(() => {
     const initializeAuth = async () => {

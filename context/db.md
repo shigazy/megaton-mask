@@ -23,7 +23,7 @@
   - Port: 5432
   - Database: postgres
   - Username: postgres
-  - Password: KW?qBfh7BshzgxX#~e63!mQWlHuy
+  - Password: 
 
 ## Notes
 - Schema changes require manual updates to the `add_columns()` function
