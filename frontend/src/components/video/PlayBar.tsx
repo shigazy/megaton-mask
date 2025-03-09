@@ -120,6 +120,15 @@ export const PlayBar: React.FC<PlayBarProps> = ({
         }
     }, [annotation]);
 
+    // Debug your PlayBar component by adding this to see what it receives:
+    useEffect(() => {
+        if (annotation) {
+            console.log("PlayBar received annotation data:", annotation);
+            console.log("PlayBar annotation frames:", Object.keys(annotation).length > 0 ?
+                Object.keys(annotation) : "No frames with annotations");
+        }
+    }, [annotation]);
+
     if (!instance) return null;
 
     const handlePlayPause = () => {
@@ -159,15 +168,20 @@ export const PlayBar: React.FC<PlayBarProps> = ({
         const video = videoRef.current;
         if (!video) return;
 
-        // Seek to the frame
-        video.currentTime = frame / FPS;
-        console.debug(`[PlayBar] Jumped to frame ${frame} (${(frame / FPS).toFixed(2)}s)`);
+        // Add a tiny offset to ensure we land exactly on the frame
+        // This helps avoid rounding errors in the browser's video implementation
+        const timeWithOffset = (frame / FPS) + 0.001;
+        video.currentTime = timeWithOffset;
 
-        if (onAnnotationClick && annotation && annotation[frame]) {
+        console.log(`Jumping to frame ${frame} (time: ${timeWithOffset.toFixed(3)}s)`);
+
+        if (onAnnotationClick) {
+            // Pass the exact frame number from our data, not a calculated one
             onAnnotationClick({
                 frame,
-                points: annotation[frame].points || [],
-                bbox: annotation[frame].bbox || null
+                exactFrame: frame.toString(),  // Pass the original string key
+                points: annotation[frame].points,
+                bbox: annotation[frame].bbox
             });
         }
     };
@@ -252,13 +266,7 @@ export const PlayBar: React.FC<PlayBarProps> = ({
                             }}
                             onClick={(e) => {
                                 e.stopPropagation();
-                                const video = videoRef.current;
-                                if (!video) return;
-                                video.currentTime = frame / FPS;
-                                console.log(`Jumped to frame ${frame} (${(frame / FPS).toFixed(2)}s)`);
-                                if (onAnnotationClick) {
-                                    onAnnotationClick({ frame, points: frameData.points, bbox: frameData.bbox });
-                                }
+                                handleAnnotationClick(e, frame);
                             }}
                             title={tooltipText}
                         />

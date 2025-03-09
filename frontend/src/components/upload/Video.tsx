@@ -79,9 +79,9 @@ interface VideoMetadata {
 }
 
 interface FrameAnnotation {
-  [currentFrame: number]: {
+  [frameNumber: string]: {
     points: Point[];
-    bbox: BBox | null;
+    bbox: number[] | null;
     mask_data: MaskData | null;
   };
 }
@@ -311,9 +311,9 @@ const AnnotationLayer = ({
       console.error('Points is not an array:', points, typeof points);
 
       // Try to get points from annotation if available
-      if (annotation && annotation[currentFrame] && Array.isArray(annotation[currentFrame].points)) {
+      if (annotation && annotation[currentFrame.toString()] && Array.isArray(annotation[currentFrame.toString()].points)) {
         console.log('Using points from annotation instead');
-        pointsToRender = annotation[currentFrame].points;
+        pointsToRender = annotation[currentFrame.toString()].points;
       }
     }
 
@@ -420,9 +420,9 @@ export const VideoUpload = ({ onUploadSuccess, fetchVideos, initialVideo, fps }:
   const [maskVideoUrl, setMaskVideoUrl] = useState<string | null>(null);
   const [drawMode, setDrawMode] = useState<'bbox' | 'points'>('bbox');
   const [pointType, setPointType] = useState<'positive' | 'negative'>('positive');
-  const [annotation, setAnnotation] = useState<FrameAnnotation[]>(initialVideo?.annotation || []);
-  const [bbox, setBbox] = useState<BBox | null>(initialVideo?.bbox || (annotation[0]?.bbox || null));
-  const [points, setPoints] = useState<Point[]>(initialVideo?.points || (annotation[0]?.points || []));
+  const [annotation, setAnnotation] = useState<FrameAnnotation>(initialVideo?.annotation || {});
+  const [bbox, setBbox] = useState<BBox | null>(initialVideo?.bbox || (annotation["0"]?.bbox || null));
+  const [points, setPoints] = useState<Point[]>(initialVideo?.points || (annotation["0"]?.points || []));
   const [pointHistory, setPointHistory] = useState<Point[][]>([]);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [videoDimensions, setVideoDimensions] = useState({ width: 0, height: 0 });
@@ -548,16 +548,18 @@ export const VideoUpload = ({ onUploadSuccess, fetchVideos, initialVideo, fps }:
 
       // Calculate current frame if not provided
       const frameToSave = currentFrame !== undefined ? currentFrame : getCurrentFrame();
-      console.log('Saving at frame:', frameToSave);
+      const frameKey = frameToSave.toString();
+      console.log('Saving at frame:', frameKey);
 
-      const annotationToSave = {
+      // Create new annotation object with updated frame data
+      const updatedAnnotation = {
         ...annotation,
-        [frameToSave]: {
+        [frameKey]: {
           points: newPoints || points,
           bbox: bboxArray,
           mask_data: newMaskData || maskData
         },
-      }
+      };
 
       const response = await fetch(url, {
         method: 'PATCH',
@@ -570,11 +572,12 @@ export const VideoUpload = ({ onUploadSuccess, fetchVideos, initialVideo, fps }:
           bbox: bboxArray,
           mask_data: newMaskData || maskData,
           current_frame: frameToSave,
-          annotation: annotationToSave
+          annotation: updatedAnnotation
         })
       });
 
-      setAnnotation(annotationToSave);
+      // Update local state with the new annotation
+      setAnnotation(updatedAnnotation);
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -587,7 +590,7 @@ export const VideoUpload = ({ onUploadSuccess, fetchVideos, initialVideo, fps }:
       console.error('Error saving changes:', error);
       setStatus('Error saving changes');
     }
-  }, [initialVideo?.id, points, bbox, maskData]);
+  }, [initialVideo?.id, points, bbox, maskData, annotation]);
 
   const getCurrentFrame = useCallback((): number => {
     const video = videoRef.current;
@@ -595,6 +598,8 @@ export const VideoUpload = ({ onUploadSuccess, fetchVideos, initialVideo, fps }:
 
     // Get FPS from video metadata or use default
     const fps = initialVideo?.video_metadata?.fps || DEFAULT_FPS;
+
+    // Use floor to ensure consistent frame calculation
     return Math.floor(video.currentTime * fps);
   }, [videoRef, initialVideo?.video_metadata?.fps]);
 
@@ -631,14 +636,14 @@ export const VideoUpload = ({ onUploadSuccess, fetchVideos, initialVideo, fps }:
     // Update the annotation for the current frame
     setAnnotation(prev => {
       const newAnnotation = { ...prev };
-      if (!newAnnotation[frame]) {
-        newAnnotation[frame] = {
+      if (!newAnnotation[frame.toString()]) {
+        newAnnotation[frame.toString()] = {
           points: [],
           bbox: null,
           mask_data: null
         };
       }
-      newAnnotation[frame].bbox = newBbox;
+      newAnnotation[frame.toString()].bbox = newBbox ? [newBbox.x, newBbox.y, newBbox.w, newBbox.h] : null;
       return newAnnotation;
     });
 
@@ -661,26 +666,51 @@ export const VideoUpload = ({ onUploadSuccess, fetchVideos, initialVideo, fps }:
     saveChanges(points, bbox, undefined, frame);
   }, [getCurrentFrame, bbox, points]);
 
-  // Add this new function
-  const handleAnnotationClick = useCallback((annotation: FrameAnnotation) => {
-    const currentFrame = getCurrentFrame();
-    console.log('Loading annotation from frame:', annotation[currentFrame]);
-    // Set the bbox and points from the annotation
-    if (annotation[currentFrame]) {
-      setBbox(annotation[currentFrame].bbox || null);
-    } else {
-      setBbox(null);
-    }
+  // Update the handleAnnotationClick function to use the exact frame
+  const handleAnnotationClick = useCallback((data: { frame: number, exactFrame?: string }) => {
+    // Use the exactFrame string key if provided, otherwise convert frame to string
+    const frameKey = data.exactFrame || data.frame.toString();
+    console.log(`Clicked on marker - using frame key: ${frameKey}`);
 
-    if (annotation[currentFrame]?.points && annotation[currentFrame].points.length > 0) {
-      setPoints(annotation[currentFrame].points);
-    } else {
-      setPoints([]);
-    }
+    // Check if annotation data exists for this exact frame key
+    if (annotation && annotation[frameKey]) {
+      console.log(`Loading annotation data for frame ${frameKey}:`, annotation[frameKey]);
 
-    // Force redraw to show the loaded annotations
-    forceRedraw();
-  }, [forceRedraw]);
+      // Set bbox and points directly from the stored annotation
+      if (annotation[frameKey].bbox) {
+        // Handle array format for bbox
+        const bboxArray = annotation[frameKey].bbox;
+        if (Array.isArray(bboxArray) && bboxArray.length === 4) {
+          const newBbox = {
+            x: bboxArray[0],
+            y: bboxArray[1],
+            w: bboxArray[2],
+            h: bboxArray[3]
+          };
+          console.log('Setting bbox to:', newBbox);
+          setBbox(newBbox);
+        }
+      }
+
+      if (annotation[frameKey].points && annotation[frameKey].points.length > 0) {
+        console.log('Setting points to:', annotation[frameKey].points);
+        setPoints(annotation[frameKey].points);
+      }
+
+      // Seek to the exact frame with a slight offset to prevent rounding issues
+      if (videoRef.current) {
+        const fps = initialVideo?.video_metadata?.fps || DEFAULT_FPS;
+        const exactTime = (data.frame / fps) + 0.001;
+        videoRef.current.currentTime = exactTime;
+        console.log(`Setting video time to ${exactTime.toFixed(3)}s for frame ${data.frame}`);
+      }
+
+      // Force redraw to ensure annotations are displayed
+      setTimeout(forceRedraw, 50); // Small delay to ensure video has updated
+    } else {
+      console.warn(`No annotation data found for frame key ${frameKey}`);
+    }
+  }, [annotation, forceRedraw, initialVideo?.video_metadata?.fps]);
 
   const handleUndo = useCallback(() => {
     setStatus('Undoing last action...');
@@ -858,7 +888,12 @@ export const VideoUpload = ({ onUploadSuccess, fetchVideos, initialVideo, fps }:
           if (initialVideo.annotation[frameKey]?.bbox &&
             JSON.stringify(initialVideo.annotation[frameKey].bbox) !== JSON.stringify(bbox)) {
             console.log('Setting bbox from initialVideo:', initialVideo.annotation[frameKey].bbox);
-            setBbox(initialVideo.annotation[frameKey].bbox);
+            setBbox(initialVideo.annotation[frameKey].bbox ? {
+              x: initialVideo.annotation[frameKey].bbox[0],
+              y: initialVideo.annotation[frameKey].bbox[1],
+              w: initialVideo.annotation[frameKey].bbox[2],
+              h: initialVideo.annotation[frameKey].bbox[3]
+            } : null);
           }
 
           // Set points from the frame
@@ -1254,6 +1289,53 @@ export const VideoUpload = ({ onUploadSuccess, fetchVideos, initialVideo, fps }:
     );
   }
 
+  // Add this useEffect to debug annotation data
+  useEffect(() => {
+    console.log('Current annotation data:', annotation);
+    console.log('Number of frames with annotations:', Object.keys(annotation).length);
+
+    // Log details of each frame's annotation
+    Object.keys(annotation).forEach(frame => {
+      console.log(`Frame ${frame} data:`, annotation[frame]);
+    });
+  }, [annotation]);
+
+  // Add this useEffect to debug initial annotation loading
+  useEffect(() => {
+    if (initialVideo?.annotation) {
+      console.log('Initial annotation data:', initialVideo.annotation);
+      console.log('Frames with annotations:', Object.keys(initialVideo.annotation));
+
+      // Ensure annotation state is properly set from initialVideo
+      setAnnotation(initialVideo.annotation);
+    }
+  }, [initialVideo?.annotation]);
+
+  // Replace the direct addEventListener with this useEffect
+  useEffect(() => {
+    // Make sure video timeupdate properly updates the current frame display
+    const videoElement = videoRef.current;
+
+    if (!videoElement) return;
+
+    const handleTimeUpdate = () => {
+      const frame = getCurrentFrame();
+      const frameStr = frame.toString();
+
+      // Log when we're at a frame that has annotation
+      if (annotation && annotation[frameStr]) {
+        console.log(`At frame ${frame} with annotation:`, annotation[frameStr]);
+      }
+    };
+
+    videoElement.addEventListener('timeupdate', handleTimeUpdate);
+
+    // Clean up function to remove the event listener when component unmounts
+    return () => {
+      videoElement.removeEventListener('timeupdate', handleTimeUpdate);
+    };
+  }, [videoRef, annotation, getCurrentFrame]); // Add dependencies
+
   return (
     <div className="card p-6">
       {!initialVideo && !videoUrl && (
@@ -1379,7 +1461,7 @@ export const VideoUpload = ({ onUploadSuccess, fetchVideos, initialVideo, fps }:
 
               {maskData && !videoStore.getInstance(MAIN_VIDEO_ID)?.isPlaying && (
                 <MaskOverlay
-                  maskData={annotation[getCurrentFrame()]?.mask_data}
+                  maskData={annotation[getCurrentFrame().toString()]?.mask_data}
                   videoWidth={videoDimensions.width}
                   videoHeight={videoDimensions.height}
                   className="absolute top-0 left-0 w-full h-full"
@@ -1395,8 +1477,8 @@ export const VideoUpload = ({ onUploadSuccess, fetchVideos, initialVideo, fps }:
                   drawMode={drawMode}
                   pointType={pointType}
                   annotation={annotation}
-                  points={annotation[getCurrentFrame()]?.points || []}
-                  bbox={annotation[getCurrentFrame()]?.bbox || null}
+                  points={annotation[getCurrentFrame().toString()]?.points || []}
+                  bbox={annotation[getCurrentFrame().toString()]?.bbox || null}
                   onPointsChange={handlePointsChange}
                   onBboxChange={handleBboxChange}
                   onPointClick={handlePointInteraction}
@@ -1436,8 +1518,8 @@ export const VideoUpload = ({ onUploadSuccess, fetchVideos, initialVideo, fps }:
                     onFullscreen={() => videoRef.current?.requestFullscreen()}
                     className="rounded-lg"
                     FPS={videoMetadata?.fps || 30}
-                    annotation={annotation}  // Add this line
-                    onAnnotationClick={handleAnnotationClick}  // Add this line
+                    annotation={annotation}
+                    onAnnotationClick={handleAnnotationClick}
                   />
 
                   <div className="p-2 border-t border-[var(--border-color)]">
@@ -1662,13 +1744,13 @@ export default VideoUpload;
 
 // Update the tooltip styles
 export const tooltipStyles = `
-  .tooltip {
-    @apply invisible absolute -top-8 left-1/2 -translate-x-1/2 px-2 py-1 rounded text-xs 
-    bg-[var(--card-background)] text-[var(--text-primary)] border border-[var(--border-color)]
-    whitespace-nowrap;
+      .tooltip {
+        @apply invisible absolute -top-8 left-1/2 -translate-x-1/2 px-2 py-1 rounded text-xs
+      bg-[var(--card-background)] text-[var(--text-primary)] border border-[var(--border-color)]
+      whitespace-nowrap;
   }
-  
-  .tooltip-wrapper:hover .tooltip {
-    @apply visible;
+
+      .tooltip-wrapper:hover .tooltip {
+        @apply visible;
   }
-`;
+      `;

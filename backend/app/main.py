@@ -419,7 +419,8 @@ async def get_videos(current_user: User = Depends(get_current_user), db: Session
             "bbox": video.bbox,
             "points": video.points,
             "maskUrl": mask_url,
-            "greenscreenUrl": greenscreen_url
+            "greenscreenUrl": greenscreen_url,
+            "annotation": video.annotation
         })
     
     return {"videos": video_list}
