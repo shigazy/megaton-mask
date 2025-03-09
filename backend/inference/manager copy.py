@@ -309,7 +309,7 @@ class InferenceManager:
                 if bbox and all(x is not None for x in bbox):
                     bbox_tensor = torch.tensor(bbox, dtype=torch.float32, device="cuda")
 
-                # Initialize tracking at the specified start_frame
+                # Initialize tracking
                 frame_idx, obj_ids, masks = predictor.add_new_points_or_box(
                     state,
                     frame_idx=start_frame,
@@ -334,12 +334,9 @@ class InferenceManager:
                 # Track frames processed for progress reporting
                 frames_processed = 0
                 
-                # Forward propagation: process frames forward from start_frame
-                print("First pass (forward propagation): collecting masks...")
+                # Process frames in smaller batches
+                print("First pass: collecting masks...")
                 for frame_idx, object_ids, masks in predictor.propagate_in_video(state):
-                    # Only process frames with index >= start_frame
-                    if frame_idx < start_frame:
-                        continue
                     frame_masks = {}
                     for obj_id, mask in zip(object_ids, masks):
                         # Move to CPU immediately to free GPU memory
@@ -347,54 +344,27 @@ class InferenceManager:
                         frame_masks[obj_id] = mask_np
                         # Delete the tensor immediately
                         del mask
+                    
                     all_frame_masks[frame_idx] = frame_masks
                     frames_processed += 1
                     
                     # Update progress callback with debug prints
                     if progress_callback and frames_processed % 5 == 0:
-                        print(f"Forward propagation: calling progress_callback with {frames_processed}/{total_frames}")
+                        print(f"Calling progress_callback with {frames_processed}/{total_frames}")
                         try:
                             progress_callback(frames_processed, total_frames)
-                            print("Progress callback executed successfully in forward propagation")
+                            print("Progress callback executed successfully")
                         except Exception as e:
-                            print(f"Error in forward progress callback: {e}")
+                            print(f"Error in progress callback: {e}")
                     
-                    print(f"Forward processed frame {frame_idx}/{total_frames}")
+                    print(f"Processed frame {frame_idx}/{total_frames}")
                     
                     # Explicitly clear CUDA cache more frequently
                     if frame_idx % 10 == 0:
                         torch.cuda.empty_cache()
-                        self.log_memory_usage(f"After forward frame {frame_idx}")
+                        self.log_memory_usage(f"After frame {frame_idx}")
                 
-                # --- New Code: Backward propagation block ---
-                if hasattr(predictor, "propagate_backward"):
-                    print("Backward propagation supported; processing frames before start_frame...")
-                    for frame_idx, object_ids, masks in predictor.propagate_backward(state):
-                        if frame_idx >= start_frame:
-                            continue  # Only process frames before start_frame
-                        frame_masks = {}
-                        for obj_id, mask in zip(object_ids, masks):
-                            mask_np = mask[0].cpu().numpy() > 0.0
-                            frame_masks[obj_id] = mask_np
-                            del mask
-                        all_frame_masks[frame_idx] = frame_masks
-                        frames_processed += 1
-                        if progress_callback and frames_processed % 5 == 0:
-                            print(f"Backward propagation: calling progress_callback with {frames_processed}/{total_frames}")
-                            try:
-                                progress_callback(frames_processed, total_frames)
-                                print("Progress callback executed successfully in backward propagation")
-                            except Exception as e:
-                                print(f"Error in backward propagation progress callback: {e}")
-                        print(f"Backward processed frame {frame_idx}")
-                        if frame_idx % 10 == 0:
-                            torch.cuda.empty_cache()
-                    print("Backward propagation completed.")
-                else:
-                    print("Backward propagation not supported; skipping backward processing.")
-                # --- End of backward propagation block ---
-                
-                # Final progress update for both forward and backward propagation
+                # Final progress update for first phase
                 if progress_callback:
                     progress_callback(frames_processed, total_frames)
                 
@@ -410,6 +380,8 @@ class InferenceManager:
                 # Process final masks in smaller batches to reduce memory usage
                 final_masks = []
                 mask_color = [(255, 255, 255), (255, 255, 255), (255, 255, 255)]
+                
+                # Use even smaller batches for final processing
                 final_batch_size = min(batch_size, 20)
                 
                 for batch_start in range(0, total_frames, final_batch_size):
@@ -418,25 +390,40 @@ class InferenceManager:
                     
                     print(f"Processing batch {batch_start}-{batch_end}...")
                     for frame_idx in range(batch_start, batch_end):
+                        # Create empty image for this frame
                         img = np.zeros((height, width, 3), np.uint8)
+                        
+                        # Get masks for this frame
                         frame_masks = all_frame_masks.get(frame_idx, {})
+                        
+                        # Apply masks to image
                         for obj_id, mask in frame_masks.items():
                             img[mask] = mask_color[(obj_id + 1) % len(mask_color)]
+                            # Delete mask after use
                             del mask
+                        
+                        # Add to batch
                         batch_masks.append(img)
+                        
+                        # Clear frame masks to save memory
                         if frame_idx in all_frame_masks:
                             del all_frame_masks[frame_idx]
                     
+                    # Append batch to final masks
                     final_masks.extend(batch_masks)
+                    
+                    # Clear memory
                     del batch_masks
                     gc.collect()
                     torch.cuda.empty_cache()
                     self.log_memory_usage(f"After batch {batch_start}-{batch_end}")
                 
+                # Clear all remaining frame masks
                 del all_frame_masks
                 gc.collect()
                 
                 print("Stacking final masks...")
+                # Stack masks in smaller chunks to reduce peak memory
                 result = self._stack_masks_in_chunks(final_masks, chunk_size=100)
                 
                 print(f"Final masks shape: {result.shape}")
@@ -446,10 +433,12 @@ class InferenceManager:
                 
         except Exception as e:
             print(f"Error in _generate_masks: {e}")
+            # Clean up on error
             torch.cuda.empty_cache()
             gc.collect()
             raise
         finally:
+            # Always clean up
             if 'state' in locals():
                 del state
             torch.cuda.empty_cache()

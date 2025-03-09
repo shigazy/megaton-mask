@@ -1558,11 +1558,11 @@ export const VideoUpload = ({ onUploadSuccess, fetchVideos, initialVideo, fps }:
                   </div>
 
                   <PlayBar
-                    videoRef={videoRef}
-                    videoId={MAIN_VIDEO_ID}
-                    onFullscreen={() => videoRef.current?.requestFullscreen()}
+                    videoRef={maskVideoRef}
+                    videoId={MASK_VIDEO_ID}
+                    onFullscreen={() => maskVideoRef.current?.requestFullscreen()}
                     className="rounded-lg"
-                    FPS={videoMetadata?.fps || 30}
+                    FPS={getFPS(initialVideo)}
                     annotation={annotation}
                     onAnnotationClick={handleAnnotationClick}
                   />
