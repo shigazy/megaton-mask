@@ -710,7 +710,8 @@ async def get_task_status(
         "status": task.status,
         "createdAt": task.created_at,
         "completedAt": task.completed_at,
-        "errorMessage": task.error_message
+        "errorMessage": task.error_message,
+        "progress": task.progress
     }
     
     # Get video for any URLs we need to return

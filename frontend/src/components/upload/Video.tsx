@@ -454,6 +454,9 @@ export const VideoUpload = ({ onUploadSuccess, fetchVideos, initialVideo, fps }:
   const [isPolling, setIsPolling] = useState(false);
   const [pollCount, setPollCount] = useState(0);
   const [isDraggingBbox, setIsDraggingBbox] = useState(false);
+  const [maskGenerationProgress, setMaskGenerationProgress] = useState(0);
+  const [maskGenerationTaskId, setMaskGenerationTaskId] = useState<string | null>(null);
+  const [isMaskGenerating, setIsMaskGenerating] = useState(false);
 
   const MAX_POLLS = 300; // Safety limit (5 minutes at 1 second intervals)
 
@@ -996,87 +999,80 @@ export const VideoUpload = ({ onUploadSuccess, fetchVideos, initialVideo, fps }:
     };
   }, []);
 
-  const pollTaskStatus = async (taskId: string) => {
-    let isPolling = true;
-    let pollCount = 0;
-    const MAX_POLLS = 300; // Safety limit (5 minutes at 1 second intervals)
+  const pollTaskStatus = useCallback(async (taskId: string) => {
+    console.log('Polling task status for taskId:', taskId);
+    if (!taskId) return;
 
-    while (isPolling && pollCount < MAX_POLLS) {
-      pollCount++;
+    setIsMaskGenerating(true);
+    setMaskGenerationTaskId(taskId);
+    setMaskGenerationProgress(0);
+    console.log('Starting to poll task status for taskId:', taskId);
 
+    const pollInterval = setInterval(async () => {
       try {
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/tasks/${taskId}`, {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-          }
-        });
-
-        if (!response.ok) {
-          console.error('Failed to fetch task status');
-          setVideoError('Failed to check processing status');
-          setIsProcessing(false);
-          isPolling = false;
-          break;
-        }
-
-        const data = await response.json();
-        console.log(`Poll #${pollCount} - Task status:`, data.status);
-
-        // Show mask as soon as it's available
-        if (data.maskUrl) {
-          setMaskVideoUrl(data.maskUrl);
-        }
-
-        // Handle different status cases
-        switch (data.status) {
-          case 'pending':
-          case 'processing':
-            // Continue polling after delay
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            break;
-
-          case 'completed':
-            console.log('Task completed successfully');
-            fetchVideos();
-            await fetchCredits();
-            setStatus('Masks generated successfully', 'success');
-            setIsProcessing(false);
-            isPolling = false; // Stop polling
-            return data;
-
-          case 'failed':
-            console.error('Task failed:', data.errorMessage || 'Processing failed');
-            setVideoError(data.errorMessage || 'Processing failed');
-            setIsProcessing(false);
-            isPolling = false; // Stop polling
-            return data;
-
-          default:
-            console.warn(`Unknown task status: ${data.status}`);
-            // For unknown status, poll a few more times then stop
-            if (pollCount > 5) {
-              console.log('Stopping polling after 5 attempts with unknown status');
-              setIsProcessing(false);
-              isPolling = false;
+        console.log('Polling task status for taskId:', taskId);
+        const response = await axios.get(
+          `${process.env.NEXT_PUBLIC_API_URL}/api/tasks/${taskId}`,
+          {
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('token')}`
             }
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            break;
+          }
+        );
+
+        const data = response.data;
+        console.log('Task status response:', data);
+
+        // Extract progress information from the response
+        if (data.progress !== undefined) {
+          const newProgress = Math.round(data.progress);
+          console.log('Setting progress from data.progress:', newProgress);
+          setMaskGenerationProgress(newProgress);
+          setStatus(`Generating masks: ${newProgress}%`, 'processing');
+        } else if (data.status === 'processing' && data.message) {
+          // Try to extract progress from message like "Processed frame 50/110"
+          const match = data.message.match(/Processed frame (\d+)\/(\d+)/);
+          if (match && match[1] && match[2]) {
+            const current = parseInt(match[1]);
+            const total = parseInt(match[2]);
+            const progress = Math.round((current / total) * 100);
+            console.log('Setting progress from message parsing:', progress, 'Current:', current, 'Total:', total);
+            setMaskGenerationProgress(progress);
+            setStatus(`Generating masks: ${progress}%`, 'processing');
+
+          }
+        }
+
+        // Check if task is complete
+        if (data.status === 'completed' || data.status === 'failed') {
+          console.log('Task completed with status:', data.status);
+          clearInterval(pollInterval);
+          setIsMaskGenerating(false);
+
+          if (data.status === 'completed') {
+            console.log('Mask generation completed successfully');
+            setStatus('Mask generation completed!', 'success');
+            // Refresh video data if needed
+            fetchVideos && fetchVideos();
+          } else {
+            console.log('Mask generation failed:', data.message || 'Unknown error');
+            setStatus('Mask generation failed: ' + (data.message || 'Unknown error'), 'error');
+          }
         }
       } catch (error) {
         console.error('Error polling task status:', error);
-        setVideoError('Failed to check processing status');
-        setIsProcessing(false);
-        isPolling = false; // Stop polling on error
+        clearInterval(pollInterval);
+        setIsMaskGenerating(false);
+        setStatus('Error checking mask generation status', 'error');
       }
-    }
+    }, 1000); // Poll every second
 
-    // If we reached the maximum number of polls
-    if (pollCount >= MAX_POLLS) {
-      console.warn('Reached maximum number of status polls');
-      setVideoError('Processing is taking longer than expected');
-      setIsProcessing(false);
-    }
-  };
+    // Clean up interval when component unmounts
+    return () => {
+      console.log('Cleaning up poll interval for taskId:', taskId);
+      clearInterval(pollInterval);
+    };
+  }, [setStatus, fetchVideos]);
 
   const generateFullMasks = async () => {
     console.log('Step 1: Starting mask generation');
@@ -1137,10 +1133,14 @@ export const VideoUpload = ({ onUploadSuccess, fetchVideos, initialVideo, fps }:
       }
 
       console.log('Step 11: Getting task ID from response');
-      const { taskId } = await response.json();
+      const data = await response.json();
+      console.log('Step 12: Task data:', data);
+      console.log('Step 12: Task ID:', data.taskId);
 
-      console.log('Step 12: Starting task status polling');
-      await pollTaskStatus(taskId);
+      // Start polling if we have a task ID
+      if (data.taskId) {
+        pollTaskStatus(data.taskId);
+      }
 
     } catch (error) {
       console.log('Step 14: Error caught:', error);
@@ -1335,6 +1335,51 @@ export const VideoUpload = ({ onUploadSuccess, fetchVideos, initialVideo, fps }:
       videoElement.removeEventListener('timeupdate', handleTimeUpdate);
     };
   }, [videoRef, annotation, getCurrentFrame]); // Add dependencies
+
+  // Add this effect to enhance the snackbar with progress information
+  useEffect(() => {
+    // Skip if not generating masks or if we're at 0% progress
+    if (!isMaskGenerating || maskGenerationProgress <= 0) return;
+
+    // Find the active snackbar in the DOM
+    const snackbars = document.querySelectorAll('.snackbar');
+    const activeSnackbar = Array.from(snackbars).find(
+      snackbar => snackbar.classList.contains('processing')
+    );
+
+    if (activeSnackbar) {
+      // Check if we already added a progress bar
+      let progressBar = activeSnackbar.querySelector('.mask-gen-progress');
+
+      if (!progressBar) {
+        // Create progress bar if it doesn't exist
+        const progressBarContainer = document.createElement('div');
+        progressBarContainer.className = 'mask-gen-progress w-full mt-2';
+
+        progressBarContainer.innerHTML = `
+          <div class="w-full bg-gray-700 rounded-full h-1">
+            <div class="bg-blue-400 h-1 rounded-full transition-all duration-300" style="width: ${maskGenerationProgress}%"></div>
+          </div>
+          <div class="text-xs mt-1 text-gray-200">${maskGenerationProgress}% complete</div>
+        `;
+
+        // Find the content area of the snackbar and append the progress bar
+        const contentArea = activeSnackbar.querySelector('.snackbar-content');
+        if (contentArea) {
+          contentArea.appendChild(progressBarContainer);
+        }
+      } else {
+        // Update existing progress bar
+        const progressFill = progressBar.querySelector('.bg-blue-400');
+        const progressText = progressBar.querySelector('.text-xs');
+
+        if (progressFill && progressText) {
+          progressFill.setAttribute('style', `width: ${maskGenerationProgress}%`);
+          progressText.textContent = `${maskGenerationProgress}% complete`;
+        }
+      }
+    }
+  }, [isMaskGenerating, maskGenerationProgress]);
 
   return (
     <div className="card p-6">
@@ -1708,15 +1753,25 @@ export const VideoUpload = ({ onUploadSuccess, fetchVideos, initialVideo, fps }:
                 </select>
                 <button
                   onClick={generateFullMasks}
-                  disabled={points.length === 0}
-                  className={`flex items-center gap-2 px-3 py-1.5 rounded-full transition-colors text-sm
-                    ${points.length > 0
+                  disabled={points.length === 0 || isMaskGenerating}
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-full transition-colors text-sm tooltip-wrapper
+                    ${points.length > 0 && !isMaskGenerating
                       ? 'bg-[var(--accent-purple)] text-white border border-[var(--accent-purple)]'
                       : 'border border-[var(--border-color)] text-[var(--text-secondary)] opacity-50 cursor-not-allowed'
                     }`}
                 >
-                  <FaPlay className="text-sm" />
-                  Generate
+                  {isMaskGenerating ? (
+                    <>
+                      <div className="animate-spin rounded-full h-3 w-3 border-t-2 border-white mr-1"></div>
+                      {console.log('Rendering progress:', maskGenerationProgress)}
+                      {maskGenerationProgress}%
+                    </>
+                  ) : (
+                    <>
+                      <FaPlay className="text-sm" />
+                      Generate
+                    </>
+                  )}
                   <span className="tooltip">Generate Masks</span>
                 </button>
                 <button

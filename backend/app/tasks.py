@@ -124,7 +124,8 @@ async def process_video_masks(
             bbox=bbox,
             super_mode=super,
             method=method,
-            start_frame=start_frame
+            start_frame=start_frame,
+            progress_callback=lambda current, total: update_task_progress(db, task_id, current, total)
         )
 
         # Memory optimization: Process masks in chunks to avoid OOM
@@ -452,3 +453,20 @@ async def process_uploaded_video(
                     os.unlink(temp_file)
             except Exception as e:
                 logger.error(f"Error cleaning up {temp_file}: {str(e)}")
+
+# Add this helper function
+def update_task_progress(db, task_id, current, total):
+    """Update task progress in the database"""
+    print(f"Updating task {task_id} progress: {current}/{total}")
+    try:
+        print(f"Updating task {task_id} progress: {current}/{total}")
+        progress_percent = (current / total) * 100 if total > 0 else 0
+        task = db.query(Task).filter(Task.id == task_id).first()
+        print(f"Task: {task}")
+        if task:
+            task.progress = progress_percent
+            print(f"Task progress: {task.progress}")
+            db.commit()
+            logger.info(f"Updated task {task_id} progress: {progress_percent:.1f}%")
+    except Exception as e:
+        logger.error(f"Error updating task progress: {str(e)}")

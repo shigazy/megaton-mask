@@ -162,6 +162,13 @@ def add_columns():
                 WHEN duplicate_column THEN NULL;
             END;
             
+            -- Add progress column to tasks table
+            BEGIN
+                ALTER TABLE tasks ADD COLUMN IF NOT EXISTS progress FLOAT NOT NULL DEFAULT 0;
+            EXCEPTION
+                WHEN duplicate_column THEN NULL;
+            END;
+            
             -- Refresh tokens table
             BEGIN
                 CREATE TABLE IF NOT EXISTS refresh_tokens (

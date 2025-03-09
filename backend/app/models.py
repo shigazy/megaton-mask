@@ -73,15 +73,17 @@ class Video(Base):
 class Task(Base):
     __tablename__ = "tasks"
 
-    id = Column(String, primary_key=True)
+    id = Column(String, primary_key=True, index=True)
     video_id = Column(String, ForeignKey("videos.id"))
-    status = Column(String)  # pending, processing, completed, failed
     user_id = Column(String, ForeignKey("users.id"))
+    status = Column(String)
     created_at = Column(DateTime, default=datetime.utcnow)
     completed_at = Column(DateTime, nullable=True)
     error_message = Column(String, nullable=True)
-    credit_cost = Column(Float)
-    credit_action = Column(String)  # e.g., "generate_masks", "generate_thumbnail", etc.
+    credit_cost = Column(Float, default=0)
+    credit_action = Column(String, nullable=True)
+    progress = Column(Float, default=0)
+
 class AdminAction(Base):
     __tablename__ = "admin_actions"
     

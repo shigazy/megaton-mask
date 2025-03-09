@@ -211,15 +211,14 @@ class InferenceManager:
     async def generate_full_video_masks(
         self,
         video_path: str,
-        points: Dict[str, List[List[float]]],
+        points: Optional[Dict[str, List[List[float]]]],
         bbox: List[float],
-        start_frame: int = 0,
         super_mode: bool = False,
-        method: str = "default"
-    ):
-        """Generate full video masks using regular model"""
-        print(f"Starting full video mask generation: {video_path} from frame {start_frame}")
-        
+        method: str = "default",
+        start_frame: int = 0,
+        progress_callback = None
+    ) -> np.ndarray:
+        """Generate masks for all frames in a video"""
         try:
             # Clear memory before starting
             self.cleanup()
@@ -228,30 +227,33 @@ class InferenceManager:
             
             # Use regular model for full masks
             predictor = await self.initialize(is_preview=False)
+            self.log_memory_usage("After initialize in generate_full_video_masks")
             
             # Get video info
             cap = cv2.VideoCapture(video_path)
             total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-            height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
             width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+            height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
             cap.release()
-
-            print(f"Video info - frames: {total_frames}, size: {width}x{height}")
+            
+            print(f"Video info: {total_frames} frames, {width}x{height}")
+            
+            # Add debug print to verify callback is passed correctly
+            print(f"Progress callback provided: {progress_callback is not None}")
             
             # Determine optimal batch size based on resolution
-            # For higher resolutions, use smaller batches
             if width * height > 1280 * 720:
-                batch_size = 10  # Smaller batch for HD+ videos
+                batch_size = 10
             else:
-                batch_size = 25  # Larger batch for smaller videos
+                batch_size = 25
                 
             print(f"Using batch size: {batch_size} for resolution {width}x{height}")
 
-            # Run the heavy computation in a thread pool to not block the event loop
+            # Run the heavy computation in a thread pool
             loop = asyncio.get_event_loop()
             result = await loop.run_in_executor(None, self._generate_masks,
                 predictor, video_path, points, bbox, super_mode, method,
-                total_frames, height, width, batch_size, start_frame)
+                total_frames, height, width, batch_size, start_frame, progress_callback)
             
             print("Masks generation completed")
             self.log_memory_usage("After masks generation")
@@ -261,13 +263,17 @@ class InferenceManager:
             print(f"Error in generate_full_video_masks: {e}")
             raise
         finally:
-            # Ensure cleanup
             self.cleanup()
+            torch.cuda.empty_cache()
+            gc.collect()
 
     def _generate_masks(self, predictor, video_path, points, bbox, super_mode, method,
-                       total_frames, height, width, batch_size=25, start_frame=0):
+                       total_frames, height, width, batch_size=25, start_frame=0, progress_callback=None):
         """Non-async version of mask generation to run in thread pool"""
         try:
+            # Debug print to verify callback is received
+            print(f"_generate_masks received progress_callback: {progress_callback is not None}")
+            
             # Start with clean memory
             torch.cuda.empty_cache()
             gc.collect()
@@ -325,6 +331,9 @@ class InferenceManager:
                 # This avoids keeping all masks in memory at once
                 all_frame_masks = {}
                 
+                # Track frames processed for progress reporting
+                frames_processed = 0
+                
                 # Process frames in smaller batches
                 print("First pass: collecting masks...")
                 for frame_idx, object_ids, masks in predictor.propagate_in_video(state):
@@ -337,12 +346,27 @@ class InferenceManager:
                         del mask
                     
                     all_frame_masks[frame_idx] = frame_masks
+                    frames_processed += 1
+                    
+                    # Update progress callback with debug prints
+                    if progress_callback and frames_processed % 5 == 0:
+                        print(f"Calling progress_callback with {frames_processed}/{total_frames}")
+                        try:
+                            progress_callback(frames_processed, total_frames)
+                            print("Progress callback executed successfully")
+                        except Exception as e:
+                            print(f"Error in progress callback: {e}")
+                    
                     print(f"Processed frame {frame_idx}/{total_frames}")
                     
                     # Explicitly clear CUDA cache more frequently
                     if frame_idx % 10 == 0:
                         torch.cuda.empty_cache()
                         self.log_memory_usage(f"After frame {frame_idx}")
+                
+                # Final progress update for first phase
+                if progress_callback:
+                    progress_callback(frames_processed, total_frames)
                 
                 # Clear state to free memory before final processing
                 del state
