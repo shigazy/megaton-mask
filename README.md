@@ -63,8 +63,10 @@ sudo pkill -f uvicorn && cd ~/megaton-roto/backend && uvicorn app.main:app --hos
 This frontend connects to a FastAPI backend. Make sure the backend server is running at `http://localhost:8000` before starting the frontend.
 
 cd backend
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000 --reload
 
+cd backend (dev)
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8001 --reload
 ## Contributing
 
 1. Create a feature branch

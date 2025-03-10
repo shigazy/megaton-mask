@@ -6,6 +6,7 @@
 
 import warnings
 from collections import OrderedDict
+import time
 
 import torch
 
@@ -48,8 +49,13 @@ class SAM2VideoPredictor(SAM2Base):
         offload_state_to_cpu=False,
         async_loading_frames=False,
     ):
+        print("Initializing inference state")
         """Initialize an inference state."""
         compute_device = self.device  # device of the model
+        print(f"DEBUG: init_state() called for video: {video_path}")
+        t0 = time.time()
+        print("DEBUG: Starting to load video frames with load_video_frames()...")
+        
         images, video_height, video_width = load_video_frames(
             video_path=video_path,
             image_size=self.image_size,
@@ -57,6 +63,11 @@ class SAM2VideoPredictor(SAM2Base):
             async_loading_frames=async_loading_frames,
             compute_device=compute_device,
         )
+        t1 = time.time()
+        num_frames = len(images)
+        print(f"DEBUG: Finished loading video frames in {t1 - t0:.2f} seconds.")
+        print(f"DEBUG: Loaded {num_frames} frames; video resolution: {video_width}x{video_height}")
+        
         inference_state = {}
         inference_state["images"] = images
         inference_state["num_frames"] = len(images)
@@ -65,8 +76,6 @@ class SAM2VideoPredictor(SAM2Base):
         inference_state["offload_video_to_cpu"] = offload_video_to_cpu
         # whether to offload the inference state to CPU memory
         # turning on this option saves the GPU memory at the cost of a lower tracking fps
-        # (e.g. in a test case of 768x768 model, fps dropped from 27 to 24 when tracking one object
-        # and from 24 to 21 when tracking two objects)
         inference_state["offload_state_to_cpu"] = offload_state_to_cpu
         # the original video height and width, used for resizing final output scores
         inference_state["video_height"] = video_height
@@ -108,6 +117,15 @@ class SAM2VideoPredictor(SAM2Base):
         inference_state["frames_already_tracked"] = {}
         # Warm up the visual backbone and cache the image feature on frame 0
         self._get_image_feature(inference_state, frame_idx=0, batch_size=1)
+        t3 = time.time()
+        print(f"DEBUG: Visual backbone warmed up in {t3 - t2:.2f} seconds.")
+        
+        print("DEBUG: init_state() completed. Inference state details:")
+        print(f"        - Total frames: {num_frames}")
+        print(f"        - Video resolution: {video_width}x{video_height}")
+        print(f"        - Offload video to CPU: {offload_video_to_cpu}")
+        print(f"        - Offload state to CPU: {offload_state_to_cpu}")
+        
         return inference_state
 
     @classmethod

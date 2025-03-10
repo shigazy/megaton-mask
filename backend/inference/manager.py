@@ -12,6 +12,8 @@ from typing import Dict, List, Optional
 import cv2
 import asyncio
 import gc
+import time
+import shutil
 
 sys.path.append("./sam2")
 from sam2.build_sam import build_sam2_video_predictor
@@ -78,10 +80,12 @@ class InferenceManager:
         try:
             # Clear memory before loading model
             self.cleanup()
+            print("You art here though 0")
             torch.cuda.empty_cache()
             gc.collect()
-            
+            print("You art here though 1")
             if is_preview:
+                print("You art here though 1.1")
                 # Use tiny model for previews
                 model_path = "/home/ec2-user/megaton-roto/backend/inference/sam2/checkpoints/sam2.1_hiera_tiny.pt"  # Adjust path as needed
                 if self.preview_predictor is None:
@@ -90,11 +94,14 @@ class InferenceManager:
                 self.log_memory_usage("Initialized preview predictor")
                 return self.preview_predictor
             else:
+                print("You art here though 2")
                 # Use regular model for full masks
                 model_path = "/home/ec2-user/megaton-roto/backend/inference/sam2/checkpoints/sam2.1_hiera_large.pt"  # Adjust path as needed
                 if self.predictor is None:
                     model_cfg = determine_model_cfg(model_path)
+                    print("You art here though 2.1")
                     self.predictor = build_sam2_video_predictor(model_cfg, model_path, device="cuda:0")
+                    print("You art here though 2.2")
                 self.log_memory_usage("Initialized full predictor")
                 return self.predictor
         except Exception as e:
@@ -118,7 +125,8 @@ class InferenceManager:
             with torch.inference_mode(), torch.autocast("cuda", dtype=torch.float16):
                 if self.current_state is None:
                     print(f"Initializing state with video_path: {video_path}")
-                    self.current_state = predictor.init_state(video_path, offload_video_to_cpu=True)
+                    self.log_memory_usage("Before init_state")
+                    state = predictor.init_state(video_path, offload_video_to_cpu=True)
                     self.log_memory_usage("After init_state")
 
                 # Prepare points
@@ -228,15 +236,19 @@ class InferenceManager:
             # Use regular model for full masks
             predictor = await self.initialize(is_preview=False)
             self.log_memory_usage("After initialize in generate_full_video_masks")
-            
+            print(video_path)
             # Get video info
             cap = cv2.VideoCapture(video_path)
+            if not cap.isOpened():
+                print("Error: Unable to open video file")
+            else:
+                print("Video file opened successfully")
             total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
             width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
             height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-            cap.release()
             
             print(f"Video info: {total_frames} frames, {width}x{height}")
+            cap.release()
             
             # Add debug print to verify callback is passed correctly
             print(f"Progress callback provided: {progress_callback is not None}")
@@ -278,12 +290,22 @@ class InferenceManager:
             torch.cuda.empty_cache()
             gc.collect()
             self.log_memory_usage("Before mask generation")
-            
+            print("You are here 1")
             with torch.inference_mode(), torch.autocast("cuda", dtype=torch.float16):
                 # Initialize state with video
-                state = predictor.init_state(video_path, offload_video_to_cpu=True)
+                print("You are here 1.1")
+                start_time = time.time()
+                try:
+                    self.log_memory_usage("Before init_state")
+                    state = predictor.init_state(video_path, offload_video_to_cpu=False)
+                    self.log_memory_usage("After init_state")
+                except Exception as exc:
+                    print(f"Error during predictor.init_state: {exc}")
+                    raise
+                end_time = time.time()
+                print(f"You are here 1.2 -- init_state completed in {end_time - start_time:.2f} seconds")
                 self.log_memory_usage("After init_state")
-                
+                print("You are here 2")
                 # Prepare points
                 all_points = []
                 all_labels = []
@@ -295,7 +317,7 @@ class InferenceManager:
                 if points.get('negative'):
                     all_points.extend(points['negative'])
                     all_labels.extend([0] * len(points['negative']))
-
+                print("You are here 3")
                 # Convert to tensors
                 if all_points:
                     points_tensor = torch.tensor(all_points, dtype=torch.float32, device="cuda")
@@ -330,14 +352,16 @@ class InferenceManager:
                 # Use a dictionary to store masks by frame index
                 # This avoids keeping all masks in memory at once
                 all_frame_masks = {}
-                
+       
                 # Track frames processed for progress reporting
                 frames_processed = 0
-                
+
+
                 # Forward propagation: process frames forward from start_frame
                 print("First pass (forward propagation): collecting masks...")
                 for frame_idx, object_ids, masks in predictor.propagate_in_video(state):
                     # Only process frames with index >= start_frame
+                    print(f"Processing frame {frame_idx}")
                     if frame_idx < start_frame:
                         continue
                     frame_masks = {}
@@ -349,7 +373,7 @@ class InferenceManager:
                         del mask
                     all_frame_masks[frame_idx] = frame_masks
                     frames_processed += 1
-                    
+                    print(f"Frames processed: {frames_processed}")
                     # Update progress callback with debug prints
                     if progress_callback and frames_processed % 5 == 0:
                         print(f"Forward propagation: calling progress_callback with {frames_processed}/{total_frames}")
@@ -437,10 +461,21 @@ class InferenceManager:
                 gc.collect()
                 
                 print("Stacking final masks...")
-                result = self._stack_masks_in_chunks(final_masks, chunk_size=100)
+                result = self._stack_masks_in_chunks(final_masks, chunk_size=100, return_chunks=True)
+                
+                # If result is a list of chunks, handle differently
+                if isinstance(result, list):
+                    print(f"Got {len(result)} chunks instead of a single array. Handling chunks...")
+                    # You can either:
+                    # 1. Process each chunk separately
+                    # 2. Save each chunk to disk separately
+                    # 3. Or merge them into a different format/data structure
                 
                 print(f"Final masks shape: {result.shape}")
                 self.log_memory_usage("After stacking final masks")
+                
+                # After sending results to client
+                self.cleanup_saved_chunks(result)
                 
                 return result
                 
@@ -456,28 +491,132 @@ class InferenceManager:
             gc.collect()
             self.log_memory_usage("After _generate_masks cleanup")
     
-    def _stack_masks_in_chunks(self, masks_list, chunk_size=100):
-        """Stack masks in chunks to reduce peak memory usage"""
+    def _stack_masks_in_chunks(self, masks_list, chunk_size=100, return_chunks=False):
+        """
+        Stack masks in chunks to reduce peak memory usage.
+        If return_chunks=True, returns a list of chunked arrays instead of one big array.
+        """
+        print("Starting _stack_masks_in_chunks")
         if len(masks_list) <= chunk_size:
+            print(f"Masks list length {len(masks_list)} <= chunk_size {chunk_size}, stacking directly")
             return np.stack(masks_list)
         
+        print(f"Processing {len(masks_list)} masks in chunks of {chunk_size}")
         # Process in chunks
         chunks = []
         for i in range(0, len(masks_list), chunk_size):
+            print(f"Processing chunk {i} to {min(i+chunk_size, len(masks_list))}")
             chunk = masks_list[i:i+chunk_size]
             stacked_chunk = np.stack(chunk)
             chunks.append(stacked_chunk)
+            print(f"Chunk shape: {stacked_chunk.shape}")
             # Clear original chunk data
             for j in range(i, min(i+chunk_size, len(masks_list))):
                 masks_list[j] = None
             gc.collect()
+            print(f"Memory cleared for chunk {i}")
         
-        # Concatenate chunks
-        result = np.concatenate(chunks, axis=0)
-        del chunks
-        gc.collect()
+        # If return_chunks=True, return the list of chunks directly
+        if return_chunks:
+            print(f"Returning {len(chunks)} separate chunks")
+            return chunks
         
-        return result
+        # Otherwise try to concatenate but with safety limits
+        try:
+            # Check total size before concatenating
+            total_elements = sum(chunk.size for chunk in chunks)
+            element_size = chunks[0].itemsize
+            total_size_gb = (total_elements * element_size) / (1024 ** 3)
+            
+            print(f"Attempting to concatenate {len(chunks)} chunks (estimated {total_size_gb:.2f} GB)")
+            if total_size_gb > 4:  # Arbitrary 4GB safety limit
+                print("WARNING: Final array would be too large (> 4GB). Returning chunks instead.")
+                return chunks
+            
+            # Proceed with concatenation if size is reasonable
+            print(f"Concatenating {len(chunks)} chunks")
+            result = np.concatenate(chunks, axis=0)
+            print(f"Concatenation complete, result shape: {result.shape}")
+            del chunks
+            gc.collect()
+            print("Chunks deleted and garbage collected")
+            return result
+            
+        except (MemoryError, ValueError) as e:
+            print(f"Memory error during concatenation: {e}. Returning chunks instead.")
+            return chunks
+
+    def _process_and_save_masks(self, masks_list, output_path, chunk_size=100):
+        """Process masks in chunks and save directly to disk"""
+        import os
+        import cv2  # or use np.save
+        
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        
+        for i in range(0, len(masks_list), chunk_size):
+            chunk_end = min(i+chunk_size, len(masks_list))
+            print(f"Processing chunk {i} to {chunk_end}")
+            
+            # Process this chunk
+            chunk = masks_list[i:chunk_end]
+            stacked_chunk = np.stack(chunk)
+            
+            # Save this chunk
+            chunk_path = f"{output_path}_{i}_{chunk_end}.npy"
+            np.save(chunk_path, stacked_chunk)
+            
+            # Clear memory
+            del chunk, stacked_chunk
+            for j in range(i, chunk_end):
+                masks_list[j] = None
+            gc.collect()
+            
+        print(f"All {len(masks_list)} masks saved in chunks")
+        return [f"{output_path}_{i}_{min(i+chunk_size, len(masks_list))}.npy" 
+                for i in range(0, len(masks_list), chunk_size)]
+
+    def cleanup_saved_chunks(self, chunk_paths, keep_combined=False):
+        """
+        Clean up saved chunk files after they've been processed
+        
+        Args:
+            chunk_paths: List of paths to chunk files
+            keep_combined: If True, keeps the final combined file
+        """
+        import os
+        
+        print(f"Cleaning up {len(chunk_paths)} chunk files")
+        
+        for path in chunk_paths:
+            if os.path.exists(path):
+                try:
+                    os.remove(path)
+                    print(f"Removed chunk file: {path}")
+                except Exception as e:
+                    print(f"Failed to remove chunk file {path}: {e}")
+        
+        print("Chunk cleanup complete")
+
+    def check_disk_space(self, min_free_gb=10):
+        """Check if there's enough disk space available"""
+        # Get the disk where chunks are stored
+        chunk_dir = "/path/to/your/chunks/directory"
+        
+        # Get disk usage statistics
+        disk_usage = shutil.disk_usage(chunk_dir)
+        
+        # Convert to GB
+        free_gb = disk_usage.free / (1024**3)
+        
+        if free_gb < min_free_gb:
+            print(f"WARNING: Low disk space! Only {free_gb:.1f}GB free")
+            # Trigger emergency cleanup
+            self.emergency_cleanup()
+        
+    def emergency_cleanup(self):
+        """Delete old chunks to free space in low-disk situations"""
+        # Similar to scheduled_chunk_cleanup but more aggressive
+        # Delete oldest files first until enough space is freed
 
 # Create singleton instance
 inference_manager = InferenceManager()
