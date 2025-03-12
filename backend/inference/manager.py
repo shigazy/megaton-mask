@@ -431,15 +431,25 @@ class InferenceManager:
                         print(f"[Manager.py] Processing mask item: {raw_mask_item}")
                         print(f"[Manager.py] Processing mask item type: {type(raw_mask_item)}")
                         # Handle the case where raw_mask_item is a tuple (which appears to be the case)
-                        # Most likely the tuple is (frame_idx, mask_tensor)
                         if isinstance(raw_mask_item, tuple):
-                            if len(raw_mask_item) >= 2:  # Ensure we have at least two elements
+                            if len(raw_mask_item) >= 3:  # The tuple has 3 elements (frame_idx, obj_ids, mask_tensor)
                                 frame_idx = raw_mask_item[0]  # First element is the frame index
-                                mask = raw_mask_item[1]       # Second element is the mask tensor
+                                mask = raw_mask_item[2]       # THIRD element is the mask tensor
                                 print(f"[Manager.py] Unpacked mask tuple for frame {frame_idx}")
                                 # Now store the mask after moving it to CPU
                                 if hasattr(mask, 'cpu'):
-                                    masks_list[frame_idx] = mask.cpu().numpy() > 0.0
+                                    mask_np = mask.cpu().numpy()
+                                    print(f"[Manager.py] Mask shape: {mask_np.shape}")
+                                    
+                                    # Ensure mask is 2D boolean by taking the first channel if needed
+                                    if len(mask_np.shape) == 4:  # [B, C, H, W]
+                                        mask_np = mask_np[0, 0] > 0.0  # Take first batch, first channel
+                                    elif len(mask_np.shape) == 3:  # [C, H, W]
+                                        mask_np = mask_np[0] > 0.0  # Take first channel
+                                    else:
+                                        mask_np = mask_np > 0.0
+                                    
+                                    masks_list[frame_idx] = mask_np
                                 else:
                                     print(f"[Manager.py] Warning: Mask for frame {frame_idx} is not a tensor: {type(mask)}")
                             else:
