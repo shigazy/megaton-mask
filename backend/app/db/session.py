@@ -53,7 +53,7 @@ def get_db():
         db.close()
 
 def add_columns():
-    """Add columns if they don't exist."""
+    """Add columns if they don't exist, and update foreign key constraints."""
     try:
         conn = psycopg2.connect(settings.DATABASE_URL)
         cursor = conn.cursor()
@@ -189,15 +189,28 @@ def add_columns():
             EXCEPTION
                 WHEN duplicate_table THEN NULL;
             END;
+
+            -- Now update the foreign key constraint for tasks.video_id
+            -- This block drops the foreign key (if it exists) and adds a new one with ON DELETE CASCADE.
+            BEGIN
+                ALTER TABLE tasks DROP CONSTRAINT IF EXISTS tasks_video_id_fkey;
+            EXCEPTION
+                WHEN undefined_object THEN
+                    NULL;
+            END;
+            
+            ALTER TABLE tasks 
+              ADD CONSTRAINT tasks_video_id_fkey 
+              FOREIGN KEY (video_id) REFERENCES videos(id) ON DELETE CASCADE;
         END $$;
         """)
 
         conn.commit()
         cursor.close()
         conn.close()
-        logger.info("Successfully added columns if they didn't exist")
+        logger.info("Successfully updated columns and foreign key constraints if needed")
     except Exception as e:
-        logger.error(f"Error adding columns: {str(e)}")
+        logger.error(f"Error adding columns or updating constraints: {str(e)}")
         raise
 
 # Add this after creating engine

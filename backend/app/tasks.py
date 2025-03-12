@@ -19,6 +19,7 @@ import io
 import gc
 import torch
 import numpy as np
+import shutil
 
 logger = logging.getLogger(__name__)
 
@@ -217,7 +218,12 @@ async def process_video_masks(
         # Clean up temporary files
         for temp_file in temp_files:
             try:
-                os.unlink(temp_file)
+                if os.path.exists(temp_file):
+                    print(f"Removing temporary file/directory: {temp_file}")
+                    if os.path.isdir(temp_file):
+                        shutil.rmtree(temp_file)
+                    else:
+                        os.unlink(temp_file)
             except Exception as e:
                 logger.error(f"Error removing temporary file {temp_file}: {str(e)}")
 
@@ -288,7 +294,12 @@ async def create_greenscreen_async(video_id, original_video_path, mask_video_pat
         # Clean up temporary files
         for temp_file in temp_files:
             try:
-                os.unlink(temp_file)
+                if os.path.exists(temp_file):
+                    print(f"Removing temporary file/directory: {temp_file}")
+                    if os.path.isdir(temp_file):
+                        shutil.rmtree(temp_file)
+                    else:
+                        os.unlink(temp_file)
             except Exception as e:
                 logger.error(f"Error removing temporary file {temp_file}: {str(e)}")
 
@@ -336,6 +347,69 @@ async def transcode_video(
         logger.error(f"Transcoding error: {str(e)}")
         raise
 
+async def transcode_to_jpg_sequence(
+    input_path: str,
+    output_dir: str,
+    fps: int = None,
+    delete_original: bool = False
+) -> str:
+    """
+    Transcode video to a sequence of JPG images
+    
+    Args:
+        input_path: Path to input video file
+        output_dir: Directory to save JPG sequence
+        fps: Optional frames per second to extract (if None, uses original video fps)
+        delete_original: Whether to delete the original video file
+    """
+    try:
+        # Get original video fps if not specified
+        if fps is None:
+            cap = cv2.VideoCapture(input_path)
+            fps = int(cap.get(cv2.CAP_PROP_FPS))
+            cap.release()
+            logger.info(f"Using original video fps: {fps}")
+
+        # Ensure output directory exists
+        os.makedirs(output_dir, exist_ok=True)
+        logger.info(f"Created output directory: {output_dir}")
+        
+        # Build the ffmpeg command
+        command = [
+            'ffmpeg',
+            '-i', input_path,
+            '-vf', f'fps={fps}',  # Use original fps or specified fps
+            '-frame_pts', '1',
+            '-q:v', '2',
+            '-f', 'image2',
+            os.path.join(output_dir, 'frame_%08d.jpg')
+        ]
+        
+        logger.info(f"Running ffmpeg command: {' '.join(command)}")
+        
+        process = subprocess.Popen(
+            command,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE
+        )
+        
+        stdout, stderr = process.communicate()
+        
+        if process.returncode != 0:
+            raise Exception(f"JPG sequence conversion failed: {stderr.decode()}")
+        
+        frame_count = len([f for f in os.listdir(output_dir) if f.endswith('.jpg')])
+        logger.info(f"Generated {frame_count} JPG frames in {output_dir}")
+            
+        return output_dir
+            
+    except Exception as e:
+        logger.error(f"JPG sequence conversion error: {str(e)}")
+        raise
+
+
+
+
 async def process_uploaded_video(
     file_path: str,
     video_id: str,
@@ -346,9 +420,11 @@ async def process_uploaded_video(
     """
     Process an uploaded video: transcode if needed, generate thumbnail, and upload to S3
     """
+    print(f"Starting process_uploaded_video for video_id: {video_id}, user_id: {user_id}")
     temp_files = []
     try:
         # Check if video needs transcoding
+        print(f"Checking if video needs transcoding: {file_path}")
         probe = subprocess.run([
             'ffprobe',
             '-v', 'error',
@@ -359,21 +435,26 @@ async def process_uploaded_video(
         ], capture_output=True, text=True)
         
         video_codec = probe.stdout.strip()
+        print(f"Detected video codec: {video_codec}")
         
         # Transcode if not H.264
         if video_codec != 'h264':
-            logger.info(f"Transcoding video from {video_codec} to h264")
+            print(f"Transcoding video from {video_codec} to h264")
             temp_mp4 = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4')
             temp_files.append(temp_mp4.name)
+            print(f"Created temporary file for transcoding: {temp_mp4.name}")
             await transcode_video(file_path, temp_mp4.name)
             process_path = temp_mp4.name
+            print(f"Transcoding completed, new path: {process_path}")
         else:
             process_path = file_path
+            print(f"No transcoding needed, using original file: {process_path}")
 
-        # Get video metadata
+        # Get video metadata and thumbnail frame first
         cap = cv2.VideoCapture(process_path)
+        fps = int(cap.get(cv2.CAP_PROP_FPS))
         metadata = {
-            "fps": cap.get(cv2.CAP_PROP_FPS),
+            "fps": fps,
             "frame_count": int(cap.get(cv2.CAP_PROP_FRAME_COUNT)),
             "width": int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)),
             "height": int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)),
@@ -384,12 +465,19 @@ async def process_uploaded_video(
             "upload_date": datetime.utcnow().isoformat()
         }
 
-        # Generate and upload thumbnail
+        # Generate thumbnail before closing the video capture
         ret, frame = cap.read()
-        cap.release()
-        
         if not ret:
             raise Exception("Failed to read video frame for thumbnail")
+
+        # Now we can close the capture
+        cap.release()
+
+        # Create jpg sequence with the original fps
+        jpg_dir = tempfile.mkdtemp()
+        temp_files.append(jpg_dir)
+        logger.info(f"Converting video to jpg sequence in {jpg_dir}")
+        await transcode_to_jpg_sequence(process_path, jpg_dir, fps=fps)
 
         # Process thumbnail
         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -400,58 +488,122 @@ async def process_uploaded_video(
         thumb_buffer.seek(0)
 
         # Upload to S3
-        s3_key = f"users/{user_id}/videos/{video_id}.mp4"
+        video_s3_key = f"users/{user_id}/videos/{video_id}.mp4"  # Store in a dedicated variable
         thumbnail_key = f"thumbnails/{video_id}.webp"
+        jpg_dir_key = f"users/{user_id}/videos/{video_id}/jpg/"
+        print(f"S3 keys prepared - video: {video_s3_key}, thumbnail: {thumbnail_key}, jpg_dir: {jpg_dir_key}")
 
         # Upload thumbnail
+        print(f"Uploading thumbnail to S3: {thumbnail_key}")
         s3_client.upload_fileobj(
             thumb_buffer,
             BUCKET_NAME,
             thumbnail_key,
             ExtraArgs={'ContentType': 'image/webp'}
         )
+        print(f"Thumbnail uploaded successfully")
 
         # Upload video
+        print(f"Uploading video to S3: {video_s3_key}")
         s3_client.upload_file(
             process_path,
             BUCKET_NAME,
-            s3_key,
+            video_s3_key,
             ExtraArgs={'ContentType': 'video/mp4'}
         )
+        print(f"Video uploaded successfully")
+
+        # Upload jpg sequence - with better error handling
+        print(f"Starting upload of JPG sequence to S3")
+        jpg_files = sorted([f for f in os.listdir(jpg_dir) if f.endswith('.jpg')])
+        print(f"Found {len(jpg_files)} JPG files to upload")
+        
+        # Check if any files were generated
+        if not jpg_files:
+            print("WARNING: No JPG files were generated!")
+            logger.warning(f"No JPG files were generated in {jpg_dir}")
+        
+        # Upload in batches to prevent timeouts
+        batch_size = 50
+        for i in range(0, len(jpg_files), batch_size):
+            batch = jpg_files[i:i+batch_size]
+            print(f"Uploading batch {i//batch_size + 1}/{(len(jpg_files)-1)//batch_size + 1} ({len(batch)} files)")
+            
+            for j, jpg_file in enumerate(batch):
+                file_path = os.path.join(jpg_dir, jpg_file)
+                jpg_s3_key = f"users/{user_id}/videos/{video_id}/jpg/{jpg_file}"  # Use a different variable name
+                
+                # Verify file exists and has content
+                if not os.path.exists(file_path):
+                    print(f"WARNING: File doesn't exist: {file_path}")
+                    continue
+                    
+                if os.path.getsize(file_path) == 0:
+                    print(f"WARNING: File is empty: {file_path}")
+                    continue
+                
+                try:
+                    s3_client.upload_file(
+                        file_path,
+                        BUCKET_NAME,
+                        jpg_s3_key,  # Use jpg_s3_key here
+                        ExtraArgs={'ContentType': 'image/jpeg'}
+                    )
+                    # Print progress every 10 files
+                    if (j % 10) == 0:
+                        print(f"  Progress: {i+j+1}/{len(jpg_files)} files uploaded")
+                except Exception as e:
+                    print(f"ERROR uploading {jpg_file}: {str(e)}")
+                    logger.error(f"Failed to upload JPG file {jpg_file}: {str(e)}")
+                    # Continue with other files
+        
+        print(f"JPG sequence upload completed")
 
         # Generate URLs
+        print(f"Generating presigned URLs")
         video_url = s3_client.generate_presigned_url(
             'get_object',
             Params={
                 'Bucket': BUCKET_NAME,
-                'Key': s3_key,
+                'Key': video_s3_key,  # Use video_s3_key here
                 'ResponseContentType': 'video/mp4',
                 'ResponseContentDisposition': 'inline'
             },
             ExpiresIn=3600
         )
+        print(f"Video URL generated: {video_url[:50]}...")
 
         thumbnail_url = s3_client.generate_presigned_url(
             'get_object',
             Params={'Bucket': BUCKET_NAME, 'Key': thumbnail_key},
             ExpiresIn=3600
         )
+        print(f"Thumbnail URL generated: {thumbnail_url[:50]}...")
 
-        return {
-            "s3_key": s3_key,
+        result = {
+            "s3_key": video_s3_key,  # Use video_s3_key here
             "thumbnail_key": thumbnail_key,
             "video_url": video_url,
             "thumbnail_url": thumbnail_url,
+            "jpg_dir_key": jpg_dir_key,
             "metadata": metadata
         }
+        print(f"Video processing completed successfully for video_id: {video_id}")
+        return result
 
     finally:
         # Cleanup temp files
+        print(f"Cleaning up {len(temp_files)} temporary files")
         for temp_file in temp_files:
             try:
                 if os.path.exists(temp_file):
-                    os.unlink(temp_file)
+                    print(f"Removing temporary file/directory: {temp_file}")
+                    if os.path.isdir(temp_file):
+                        shutil.rmtree(temp_file)
+                    else:
+                        os.unlink(temp_file)
             except Exception as e:
+                print(f"Error cleaning up {temp_file}: {str(e)}")
                 logger.error(f"Error cleaning up {temp_file}: {str(e)}")
 
 # Add this helper function

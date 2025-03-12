@@ -54,10 +54,10 @@ class User(Base):
 class Video(Base):
     __tablename__ = "videos"
 
-    id = Column(String, primary_key=True)
+    id = Column(String, primary_key=True, index=True)
     title = Column(String)
     s3_key = Column(String)
-    thumbnail_key = Column(String, nullable=True)
+    thumbnail_key = Column(String)
     mask_key = Column(String, nullable=True)
     user_id = Column(String, ForeignKey("users.id"))
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -69,6 +69,7 @@ class Video(Base):
     video_metadata = Column(JSON, nullable=True)  # Store the metadata
     video_keys = Column(JSON, nullable=True)  # Store the keys
     annotation = Column(JSON, nullable=True)  # Store the annotation
+    jpg_dir_key = Column(String, nullable=True)
 
 class Task(Base):
     __tablename__ = "tasks"

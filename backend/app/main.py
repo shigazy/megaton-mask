@@ -351,7 +351,8 @@ async def upload_video(
             s3_key=processed_data["s3_key"],
             thumbnail_key=processed_data["thumbnail_key"],
             user_id=current_user.id,
-            video_metadata=processed_data["metadata"]
+            video_metadata=processed_data["metadata"],
+            jpg_dir_key=processed_data["jpg_dir_key"]
         )
         db.add(video)
         db.commit()

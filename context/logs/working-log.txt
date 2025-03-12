@@ -1,0 +1,397 @@
+/home/ec2-user/megaton-roto/backend/inference/sam2/sam2/modeling/sam/transformer.py:23: UserWarning: Flash Attention is disabled as it requires a GPU with Ampere (8.0) CUDA capability.
+  OLD_GPU, USE_FLASH_ATTN, MATH_KERNEL_ON = get_sdpa_settings()
+SAMURAI mode: True
+INFO:root:Loaded checkpoint sucessfully
+[Manager.py] You art here though 2.2
+[Manager.py] [MEMORY] Initialized full predictor - CUDA Memory: 0.84GB allocated, 0.90GB reserved
+INFO:     Application startup complete.
+Starting generate_full_masks for video_id: 1d52ffc1-c6f0-4b49-b515-f85be2551188
+Received request body: {'bbox': [126.6110183639399, 168.28046744574291, 985.6427378964942, 889.482470784641], 'points': {'positive': [[363.80634390651085, 918.330550918197], [376.62771285475793, 661.9031719532554], [424.7078464106845, 455.1585976627713], [506.4440734557596, 294.8914858096828], [524.0734557595994, 176.29382303839733], [613.8230383973289, 775.6928213689482], [617.0283806343907, 895.8931552587646], [602.6043405676127, 509.6494156928214], [778.89816360601, 653.889816360601], [891.0851419031719, 745.2420701168614], [1064.1736227045076, 769.2821368948247]], 'negative': [[927.9465776293823, 867.0450751252087], [687.5459098497496, 734.0233722871452], [788.5141903171954, 1027.3121869782972], [899.0984974958265, 1024.1068447412354], [1052.9549248747912, 971.2186978297162], [1052.9549248747912, 855.8263772954925], [921.5358931552588, 306.110183639399], [580.1669449081803, 173.08848080133555], [700.3672787979967, 328.5475792988314], [788.5141903171954, 431.118530884808], [1048.1469115191987, 663.5058430717863], [1059.3656093489149, 354.1903171953256], [1057.762938230384, 258.0300500834725], [259.6327212020033, 270.85141903171956], [224.3739565943239, 434.3238731218698], [205.14190317195326, 617.0283806343907], [176.29382303839733, 790.1168614357263], [168.28046744574291, 961.6026711185309]]}, 'super': True, 'method': 'preprocess', 'start_frame': 0}
+Parsed request data: bbox=[126.6110183639399, 168.28046744574291, 985.6427378964942, 889.482470784641] points={'positive': [[363.80634390651085, 918.330550918197], [376.62771285475793, 661.9031719532554], [424.7078464106845, 455.1585976627713], [506.4440734557596, 294.8914858096828], [524.0734557595994, 176.29382303839733], [613.8230383973289, 775.6928213689482], [617.0283806343907, 895.8931552587646], [602.6043405676127, 509.6494156928214], [778.89816360601, 653.889816360601], [891.0851419031719, 745.2420701168614], [1064.1736227045076, 769.2821368948247]], 'negative': [[927.9465776293823, 867.0450751252087], [687.5459098497496, 734.0233722871452], [788.5141903171954, 1027.3121869782972], [899.0984974958265, 1024.1068447412354], [1052.9549248747912, 971.2186978297162], [1052.9549248747912, 855.8263772954925], [921.5358931552588, 306.110183639399], [580.1669449081803, 173.08848080133555], [700.3672787979967, 328.5475792988314], [788.5141903171954, 431.118530884808], [1048.1469115191987, 663.5058430717863], [1059.3656093489149, 354.1903171953256], [1057.762938230384, 258.0300500834725], [259.6327212020033, 270.85141903171956], [224.3739565943239, 434.3238731218698], [205.14190317195326, 617.0283806343907], [176.29382303839733, 790.1168614357263], [168.28046744574291, 961.6026711185309]]} super=True method='preprocess' start_frame=0
+Querying video from database...
+Found video: 1d52ffc1-c6f0-4b49-b515-f85be2551188
+Video metadata: {'fps': 23.976023976023978, 'codec': 'h264', 'width': 1920, 'height': 1080, 'duration': 10.427083333333332, 'file_size': 20661792, 'frame_count': 250, 'upload_date': '2025-03-02T23:33:27.925278', 'uploaded_filename': 'SHOT 1.mp4'}
+Video duration: 10.427083333333332
+Created credits manager
+Getting cost estimate...
+Cost estimate: {'cost': 3.09, 'action': 'generate_masks', 'actionInfo': {'base': 1, 'super': 2, 'per_minute': 0.5, 'description': 'Generate video masks', 'refundable': True}, 'duration': 10.427083333333332, 'options': {'super': True}}
+Attempting to deduct credits...
+Successfully deducted 3.09 credits
+Creating task...
+Created task with id: 9cb74991-f346-4e26-9730-be6a795801c4
+Saved task to database
+INFO:app.main:Adding task 9cb74991-f346-4e26-9730-be6a795801c4 to background processing
+Request data:
+bbox=[126.6110183639399, 168.28046744574291, 985.6427378964942, 889.482470784641] points={'positive': [[363.80634390651085, 918.330550918197], [376.62771285475793, 661.9031719532554], [424.7078464106845, 455.1585976627713], [506.4440734557596, 294.8914858096828], [524.0734557595994, 176.29382303839733], [613.8230383973289, 775.6928213689482], [617.0283806343907, 895.8931552587646], [602.6043405676127, 509.6494156928214], [778.89816360601, 653.889816360601], [891.0851419031719, 745.2420701168614], [1064.1736227045076, 769.2821368948247]], 'negative': [[927.9465776293823, 867.0450751252087], [687.5459098497496, 734.0233722871452], [788.5141903171954, 1027.3121869782972], [899.0984974958265, 1024.1068447412354], [1052.9549248747912, 971.2186978297162], [1052.9549248747912, 855.8263772954925], [921.5358931552588, 306.110183639399], [580.1669449081803, 173.08848080133555], [700.3672787979967, 328.5475792988314], [788.5141903171954, 431.118530884808], [1048.1469115191987, 663.5058430717863], [1059.3656093489149, 354.1903171953256], [1057.762938230384, 258.0300500834725], [259.6327212020033, 270.85141903171956], [224.3739565943239, 434.3238731218698], [205.14190317195326, 617.0283806343907], [176.29382303839733, 790.1168614357263], [168.28046744574291, 961.6026711185309]]} super=True method='preprocess' start_frame=0
+start_frame 0
+Adding task to background tasks...
+Task added to background tasks
+Preparing response...
+Returning response: {'taskId': '9cb74991-f346-4e26-9730-be6a795801c4', 'creditCost': 3.09, 'remainingCredits': 3072, 'estimate': {'cost': 3.09, 'action': 'generate_masks', 'actionInfo': {'base': 1, 'super': 2, 'per_minute': 0.5, 'description': 'Generate video masks', 'refundable': True}, 'duration': 10.427083333333332, 'options': {'super': True}}}
+INFO:     23.240.42.54:0 - "POST /api/videos/1d52ffc1-c6f0-4b49-b515-f85be2551188/generate-masks HTTP/1.0" 200 OK
+INFO:app.tasks:Using fps: 23.976023976023978 from video metadata
+INFO:app.tasks:Super mode detected - checking for forward-reverse video
+[Manager.py] [MEMORY] After cleanup - CUDA Memory: 0.84GB allocated, 0.90GB reserved
+[Manager.py] [MEMORY] After cleanup - CUDA Memory: 0.84GB allocated, 0.90GB reserved
+[Manager.py] You art here though 0
+[Manager.py] You art here though 1
+[Manager.py] You art here though 2
+[Manager.py] [MEMORY] Initialized full predictor - CUDA Memory: 0.84GB allocated, 0.90GB reserved
+[Manager.py] [MEMORY] After initialize in generate_full_video_masks - CUDA Memory: 0.84GB allocated, 0.90GB reserved
+/tmp/tmpl53z53km.mp4
+[Manager.py] Video file opened successfully
+[Manager.py] Video info: 500 frames, 1920x1080
+[Manager.py] Progress callback provided: True
+[Manager.py] Using batch size: 10 for resolution 1920x1080
+[Manager.py] _generate_masks received progress_callback: True
+[Manager.py] [MEMORY] Before mask generation - CUDA Memory: 0.84GB allocated, 0.90GB reserved
+[Manager.py] [MEMORY] Before init_state - CUDA Memory: 0.84GB allocated, 0.90GB reserved
+Initializing inference state - production
+DEBUG: init_state() called for video: /tmp/tmpl53z53km.mp4
+DEBUG: Starting to load video frames with load_video_frames()...
+[Misc.py] Loading video frames
+[Misc.py] is_bytes False
+[Misc.py] is_str True
+[Misc.py] is_mp4_path True
+[Misc.py] Loading video frames from video file
+[Misc.py] Starting load_video_frames_from_video_file
+INFO:     23.240.42.54:0 - "GET /api/videos/1d52ffc1-c6f0-4b49-b515-f85be2551188/refresh-url HTTP/1.0" 200 OK
+[Misc.py] Creating VideoFrameStream
+[Misc.py] Initializing VideoFrameStream
+[Misc.py] Opening video: /tmp/tmpl53z53km.mp4
+[Misc.py] Getting video metadata
+[Misc.py] Closing video reader
+[Misc.py] Initialized video stream: 500 frames, 1920x1080
+[Misc.py] Getting video dimensions
+[Misc.py] Returning stream with dimensions {video_width}x{video_height}
+DEBUG: Video height: 1080
+DEBUG: Video width: 1920
+[Misc.py] Getting total frame count
+DEBUG: Finished loading video frames in 0.29 seconds.
+DEBUG: Loaded 500 frames; video resolution: 1920x1080
+[Misc.py] Getting total frame count
+[Misc.py] Getting frame {idx}
+[Misc.py] Loading frame {idx} from video file
+[Misc.py] Opening video: /tmp/tmpl53z53km.mp4
+[Misc.py] Resizing to 1024x1024
+INFO:     23.240.42.54:0 - "GET /api/videos/1d52ffc1-c6f0-4b49-b515-f85be2551188/refresh-url HTTP/1.0" 200 OK
+INFO:     23.240.42.54:0 - "GET /api/tasks/9cb74991-f346-4e26-9730-be6a795801c4 HTTP/1.0" 200 OK
+[Misc.py] Closing video reader
+[Misc.py] Caching frame {idx}
+[Misc.py] Frame {idx} cached
+[Misc.py] Returning frame {idx}
+INFO:     23.240.42.54:0 - "GET /api/videos/1d52ffc1-c6f0-4b49-b515-f85be2551188/refresh-url HTTP/1.0" 200 OK
+DEBUG: Visual backbone warmed up in 0.70 seconds.
+DEBUG: init_state() completed. Inference state details:
+        - Total frames: 500
+        - Video resolution: 1920x1080
+        - Offload video to CPU: False
+        - Offload state to CPU: False
+[Manager.py] [MEMORY] After init_state - CUDA Memory: 1.40GB allocated, 1.66GB reserved
+Updating task 9cb74991-f346-4e26-9730-be6a795801c4 progress: 0/500
+Updating task 9cb74991-f346-4e26-9730-be6a795801c4 progress: 0/500
+Task: <app.models.Task object at 0x7f00488aaf20>
+Task progress: 0.0
+INFO:app.tasks:Updated task 9cb74991-f346-4e26-9730-be6a795801c4 progress: 0.0%
+[Manager.py] Adding points/box to frame 0
+[SAM2 Predictor] Running inference on frame 0, batch_size=1
+[SAM2 Predictor] Initial conditioning frame: True, reverse: False
+[SAM2 Predictor] Point inputs: {'point_coords': tensor([[[ 67.5259, 159.5548],
+         [525.6761, 843.3611],
+         [194.0300, 870.7134],
+         [200.8681, 627.5823],
+         [226.5108, 431.5578],
+         [270.1035, 279.6008],
+         [279.5058, 167.1527],
+         [327.3723, 735.4717],
+         [329.0818, 849.4394],
+         [321.3890, 483.2231],
+         [415.4124, 619.9844],
+         [475.2454, 706.5999],
+         [567.5593, 729.3934],
+         [494.9048, 822.0872],
+         [366.6911, 695.9629],
+         [420.5409, 974.0441],
+         [479.5192, 971.0050],
+         [561.5760, 920.8592],
+         [561.5760, 811.4502],
+         [491.4858, 290.2378],
+         [309.4224, 164.1135],
+         [373.5292, 311.5118],
+         [420.5409, 408.7642],
+         [559.0117, 629.1019],
+         [564.9950, 335.8249],
+         [564.1403, 244.6507],
+         [138.4708, 256.8073],
+         [119.6661, 411.8034],
+         [109.4090, 585.0343],
+         [ 94.0234, 749.1479],
+         [ 89.7496, 911.7418]]], device='cuda:0'), 'point_labels': tensor([[2, 3, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+         0, 0, 0, 0, 0, 0, 0]], device='cuda:0', dtype=torch.int32)}, Mask inputs: None
+[SAM2 Predictor] Prev sam mask logits: None
+[SAM2 Predictor] Retrieving image features for frame 1741642652.946377
+[SAM2 Predictor] Retrieved image features for frame 1741642652.9464657
+[SAM2 Predictor] Retrieved image features in 0.000s
+[SAM2 Predictor] Input type: points
+INFO:     23.240.42.54:0 - "GET /api/tasks/9cb74991-f346-4e26-9730-be6a795801c4 HTTP/1.0" 200 OK
+[SAM2 Predictor] Completed track_step in 0.257s
+[SAM2 Predictor] Filling holes with area threshold 8
+/home/ec2-user/megaton-roto/backend/inference/sam2/sam2/sam2_video_predictor.py:1037: UserWarning: /home/ec2-user/megaton-roto/backend/inference/sam2/sam2/_C.so: undefined symbol: _ZN3c1015SmallVectorBaseIjE8grow_podEPKvmm
+
+Skipping the post-processing step due to the error above. You can still use SAM 2 and it's OK to ignore the error above, although some post-processing functionality may be limited (which doesn't affect the results in most cases; see https://github.com/facebookresearch/sam2/blob/main/INSTALL.md).
+  pred_masks_gpu = fill_holes_in_mask_scores(
+[SAM2 Predictor] Post-processed results in 0.002s
+[SAM2 Predictor] Total inference time for frame 0: 0.260s
+[Manager.py] [MEMORY] After add_new_points_or_box - CUDA Memory: 1.41GB allocated, 1.66GB reserved
+[Manager.py] Initial mask generated for frame 0
+[Manager.py] Processing video frames...
+[Manager.py] Calling forward propagation with start_frame_idx: 1 and tracking for 499 frames
+[SAM2 Predictor] Propagate in video preflight
+[SAM2 Predictor] Propagate in video preflight complete
+[SAM2 Predictor] Clear non-cond mem: False
+[SAM2 Predictor] Using provided start frame: 1
+[SAM2 Predictor] Will track 499 frames
+[SAM2 Predictor] Reverse tracking: False
+[SAM2 Predictor] End frame index (forward): 499
+[SAM2 Predictor] Processing range (forward): 1 to 499
+[SAM2 Predictor] Starting frame-by-frame processing with 499 frames
+propagate in video:   0%|                                              | 0/499 [00:00<?, ?it/s][SAM2 Predictor] Processing frame 1
+[SAM2 Predictor] Frame 1 needs inference
+[SAM2 Predictor] Running single frame inference for frame 1
+[SAM2 Predictor] Running inference on frame 1, batch_size=1
+[SAM2 Predictor] Initial conditioning frame: False, reverse: False
+[SAM2 Predictor] Point inputs: None, Mask inputs: None
+[SAM2 Predictor] Prev sam mask logits: None
+[SAM2 Predictor] Retrieving image features for frame 1741642653.2841232
+[Misc.py] Getting frame {idx}
+[Misc.py] Loading frame {idx} from video file
+[Misc.py] Opening video: /tmp/tmpl53z53km.mp4
+[Misc.py] Resizing to 1024x1024
+[Misc.py] Closing video reader
+[Misc.py] Caching frame {idx}
+[Misc.py] Frame {idx} cached
+[Misc.py] Returning frame {idx}
+[SAM2 Predictor] Retrieved image features for frame 1741642653.568467
+[SAM2 Predictor] Retrieved image features in 0.284s
+[SAM2 Predictor] Input type: none
+INFO:     23.240.42.54:0 - "GET /api/tasks/9cb74991-f346-4e26-9730-be6a795801c4 HTTP/1.0" 200 OK
+[SAM2 Predictor] Completed track_step in 0.660s
+[SAM2 Predictor] Filling holes with area threshold 8
+[SAM2 Predictor] Post-processed results in 0.002s
+[SAM2 Predictor] Total inference time for frame 1: 0.946s
+[SAM2 Predictor] Inference complete for frame 1
+[SAM2 Predictor] Stored output for frame 1 in non_cond_frame_outputs
+[SAM2 Predictor] Adding per-object output for frame 1
+[SAM2 Predictor] Marking frame 1 as tracked with reverse=False
+[SAM2 Predictor] About to process pred_masks for frame 1 with pred_masks type: <class 'torch.Tensor'>
+[SAM2 Predictor] Frame 1 got video_res_masks of type: <class 'torch.Tensor'>
+[SAM2 Predictor] video_res_masks is not list-like; contents: tensor([[[[2.3242, 2.3242, 2.3242,  ..., 1.7291, 1.7291, 1.7291],
+          [2.3242, 2.3242, 2.3242,  ..., 1.7291, 1.7291, 1.7291],
+          [2.4338, 2.4338, 2.4338,  ..., 1.8759, 1.8759, 1.8759],
+          ...,
+          [0.7512, 0.7512, 0.7512,  ..., 0.7928, 0.7928, 0.7928],
+          [0.7200, 0.7200, 0.7200,  ..., 0.6666, 0.6666, 0.6666],
+          [0.7200, 0.7200, 0.7200,  ..., 0.6666, 0.6666, 0.6666]]]],
+       device='cuda:0')
+propagate in video:   0%|                                      | 1/499 [00:00<07:52,  1.05it/s][SAM2 Predictor] Processing frame 2
+[SAM2 Predictor] Frame 2 needs inference
+[SAM2 Predictor] Running single frame inference for frame 2
+[SAM2 Predictor] Running inference on frame 2, batch_size=1
+[SAM2 Predictor] Initial conditioning frame: False, reverse: False
+[SAM2 Predictor] Point inputs: None, Mask inputs: None
+[SAM2 Predictor] Prev sam mask logits: None
+[SAM2 Predictor] Retrieving image features for frame 1741642654.2332463
+[Misc.py] Getting frame {idx}
+[Misc.py] Loading frame {idx} from video file
+[Misc.py] Opening video: /tmp/tmpl53z53km.mp4
+[Misc.py] Resizing to 1024x1024
+[Misc.py] Closing video reader
+[Misc.py] Caching frame {idx}
+[Misc.py] Frame {idx} cached
+[Misc.py] Returning frame {idx}
+[SAM2 Predictor] Retrieved image features for frame 1741642654.492141
+[SAM2 Predictor] Retrieved image features in 0.259s
+[SAM2 Predictor] Input type: none
+INFO:     23.240.42.54:0 - "GET /api/tasks/9cb74991-f346-4e26-9730-be6a795801c4 HTTP/1.0" 200 OK
+[SAM2 Predictor] Completed track_step in 0.645s
+[SAM2 Predictor] Filling holes with area threshold 8
+[SAM2 Predictor] Post-processed results in 0.002s
+[SAM2 Predictor] Total inference time for frame 2: 0.906s
+[SAM2 Predictor] Inference complete for frame 2
+[SAM2 Predictor] Stored output for frame 2 in non_cond_frame_outputs
+[SAM2 Predictor] Adding per-object output for frame 2
+[SAM2 Predictor] Marking frame 2 as tracked with reverse=False
+[SAM2 Predictor] About to process pred_masks for frame 2 with pred_masks type: <class 'torch.Tensor'>
+[SAM2 Predictor] Frame 2 got video_res_masks of type: <class 'torch.Tensor'>
+[SAM2 Predictor] video_res_masks is not list-like; contents: tensor([[[[0.9436, 0.9436, 0.9436,  ..., 0.4718, 0.4718, 0.4718],
+          [0.9436, 0.9436, 0.9436,  ..., 0.4718, 0.4718, 0.4718],
+          [1.0242, 1.0242, 1.0242,  ..., 0.6147, 0.6147, 0.6147],
+          ...,
+          [0.6667, 0.6667, 0.6667,  ..., 0.3337, 0.3337, 0.3337],
+          [0.6180, 0.6180, 0.6180,  ..., 0.2578, 0.2578, 0.2578],
+          [0.6180, 0.6180, 0.6180,  ..., 0.2578, 0.2578, 0.2578]]]],
+       device='cuda:0')
+propagate in video:   0%|▏                                     | 2/499 [00:01<07:40,  1.08it/s][SAM2 Predictor] Processing frame 3
+[SAM2 Predictor] Frame 3 needs inference
+[SAM2 Predictor] Running single frame inference for frame 3
+[SAM2 Predictor] Running inference on frame 3, batch_size=1
+[SAM2 Predictor] Initial conditioning frame: False, reverse: False
+[SAM2 Predictor] Point inputs: None, Mask inputs: None
+[SAM2 Predictor] Prev sam mask logits: None
+[SAM2 Predictor] Retrieving image features for frame 1741642655.1433785
+[Misc.py] Getting frame {idx}
+[Misc.py] Loading frame {idx} from video file
+[Misc.py] Opening video: /tmp/tmpl53z53km.mp4
+[Misc.py] Resizing to 1024x1024
+[Misc.py] Closing video reader
+[Misc.py] Caching frame {idx}
+[Misc.py] Frame {idx} cached
+[Misc.py] Returning frame {idx}
+[SAM2 Predictor] Retrieved image features for frame 1741642655.4159536
+[SAM2 Predictor] Retrieved image features in 0.273s
+[SAM2 Predictor] Input type: none
+INFO:     23.240.42.54:0 - "GET /api/tasks/9cb74991-f346-4e26-9730-be6a795801c4 HTTP/1.0" 200 OK
+[SAM2 Predictor] Completed track_step in 0.640s
+[SAM2 Predictor] Filling holes with area threshold 8
+[SAM2 Predictor] Post-processed results in 0.002s
+[SAM2 Predictor] Total inference time for frame 3: 0.915s
+[SAM2 Predictor] Inference complete for frame 3
+[SAM2 Predictor] Stored output for frame 3 in non_cond_frame_outputs
+[SAM2 Predictor] Adding per-object output for frame 3
+[SAM2 Predictor] Marking frame 3 as tracked with reverse=False
+[SAM2 Predictor] About to process pred_masks for frame 3 with pred_masks type: <class 'torch.Tensor'>
+[SAM2 Predictor] Frame 3 got video_res_masks of type: <class 'torch.Tensor'>
+[SAM2 Predictor] video_res_masks is not list-like; contents: tensor([[[[0.6048, 0.6048, 0.6048,  ..., 0.3895, 0.3895, 0.3895],
+          [0.6048, 0.6048, 0.6048,  ..., 0.3895, 0.3895, 0.3895],
+          [0.6848, 0.6848, 0.6848,  ..., 0.5415, 0.5415, 0.5415],
+          ...,
+          [0.9599, 0.9599, 0.9599,  ..., 0.6570, 0.6570, 0.6570],
+          [0.9100, 0.9100, 0.9100,  ..., 0.5721, 0.5721, 0.5721],
+          [0.9100, 0.9100, 0.9100,  ..., 0.5721, 0.5721, 0.5721]]]],
+       device='cuda:0')
+propagate in video:   1%|▏                                     | 3/499 [00:02<07:37,  1.08it/s][SAM2 Predictor] Processing frame 4
+[SAM2 Predictor] Frame 4 needs inference
+[SAM2 Predictor] Running single frame inference for frame 4
+[SAM2 Predictor] Running inference on frame 4, batch_size=1
+[SAM2 Predictor] Initial conditioning frame: False, reverse: False
+[SAM2 Predictor] Point inputs: None, Mask inputs: None
+[SAM2 Predictor] Prev sam mask logits: None
+[SAM2 Predictor] Retrieving image features for frame 1741642656.061985
+[Misc.py] Getting frame {idx}
+[Misc.py] Loading frame {idx} from video file
+[Misc.py] Opening video: /tmp/tmpl53z53km.mp4
+[Misc.py] Resizing to 1024x1024
+[Misc.py] Closing video reader
+[Misc.py] Caching frame {idx}
+[Misc.py] Frame {idx} cached
+[Misc.py] Returning frame {idx}
+[SAM2 Predictor] Retrieved image features for frame 1741642656.3253963
+[SAM2 Predictor] Retrieved image features in 0.263s
+[SAM2 Predictor] Input type: none
+[SAM2 Predictor] Completed track_step in 0.654s
+[SAM2 Predictor] Filling holes with area threshold 8
+[SAM2 Predictor] Post-processed results in 0.002s
+[SAM2 Predictor] Total inference time for frame 4: 0.920s
+[SAM2 Predictor] Inference complete for frame 4
+[SAM2 Predictor] Stored output for frame 4 in non_cond_frame_outputs
+[SAM2 Predictor] Adding per-object output for frame 4
+[SAM2 Predictor] Marking frame 4 as tracked with reverse=False
+[SAM2 Predictor] About to process pred_masks for frame 4 with pred_masks type: <class 'torch.Tensor'>
+[SAM2 Predictor] Frame 4 got video_res_masks of type: <class 'torch.Tensor'>
+[SAM2 Predictor] video_res_masks is not list-like; contents: tensor([[[[-0.1959, -0.1959, -0.1959,  ..., -0.2863, -0.2863, -0.2863],
+          [-0.1959, -0.1959, -0.1959,  ..., -0.2863, -0.2863, -0.2863],
+          [-0.1171, -0.1171, -0.1171,  ..., -0.1367, -0.1367, -0.1367],
+          ...,
+          [ 0.8574,  0.8574,  0.8574,  ...,  0.3020,  0.3020,  0.3020],
+          [ 0.8101,  0.8101,  0.8101,  ...,  0.2261,  0.2261,  0.2261],
+          [ 0.8101,  0.8101,  0.8101,  ...,  0.2261,  0.2261,  0.2261]]]],
+       device='cuda:0')
+propagate in video:   1%|▎                                     | 4/499 [00:03<07:37,  1.08it/s][SAM2 Predictor] Processing frame 5
+[SAM2 Predictor] Frame 5 needs inference
+[SAM2 Predictor] Running single frame inference for frame 5
+[SAM2 Predictor] Running inference on frame 5, batch_size=1
+[SAM2 Predictor] Initial conditioning frame: False, reverse: False
+[SAM2 Predictor] Point inputs: None, Mask inputs: None
+[SAM2 Predictor] Prev sam mask logits: None
+[SAM2 Predictor] Retrieving image features for frame 1741642656.9861097
+[Misc.py] Getting frame {idx}
+[Misc.py] Loading frame {idx} from video file
+[Misc.py] Opening video: /tmp/tmpl53z53km.mp4
+[Misc.py] Resizing to 1024x1024
+INFO:     23.240.42.54:0 - "GET /api/tasks/9cb74991-f346-4e26-9730-be6a795801c4 HTTP/1.0" 200 OK
+[Misc.py] Closing video reader
+[Misc.py] Caching frame {idx}
+[Misc.py] Frame {idx} cached
+[Misc.py] Returning frame {idx}
+[SAM2 Predictor] Retrieved image features for frame 1741642657.2602491
+[SAM2 Predictor] Retrieved image features in 0.274s
+[SAM2 Predictor] Input type: none
+[SAM2 Predictor] Completed track_step in 0.688s
+[SAM2 Predictor] Filling holes with area threshold 8
+[SAM2 Predictor] Post-processed results in 0.002s
+[SAM2 Predictor] Total inference time for frame 5: 0.964s
+[SAM2 Predictor] Inference complete for frame 5
+[SAM2 Predictor] Stored output for frame 5 in non_cond_frame_outputs
+[SAM2 Predictor] Adding per-object output for frame 5
+[SAM2 Predictor] Marking frame 5 as tracked with reverse=False
+[SAM2 Predictor] About to process pred_masks for frame 5 with pred_masks type: <class 'torch.Tensor'>
+[SAM2 Predictor] Frame 5 got video_res_masks of type: <class 'torch.Tensor'>
+[SAM2 Predictor] video_res_masks is not list-like; contents: tensor([[[[-0.7411, -0.7411, -0.7411,  ..., -0.7343, -0.7343, -0.7343],
+          [-0.7411, -0.7411, -0.7411,  ..., -0.7343, -0.7343, -0.7343],
+          [-0.6651, -0.6651, -0.6651,  ..., -0.5950, -0.5950, -0.5950],
+          ...,
+          [ 0.9645,  0.9645,  0.9645,  ..., -0.0118, -0.0118, -0.0118],
+          [ 0.9315,  0.9315,  0.9315,  ..., -0.0884, -0.0884, -0.0884],
+          [ 0.9315,  0.9315,  0.9315,  ..., -0.0884, -0.0884, -0.0884]]]],
+       device='cuda:0')
+propagate in video:   1%|▍                                     | 5/499 [00:04<07:44,  1.06it/s][SAM2 Predictor] Processing frame 6
+[SAM2 Predictor] Frame 6 needs inference
+[SAM2 Predictor] Running single frame inference for frame 6
+[SAM2 Predictor] Running inference on frame 6, batch_size=1
+[SAM2 Predictor] Initial conditioning frame: False, reverse: False
+[SAM2 Predictor] Point inputs: None, Mask inputs: None
+[SAM2 Predictor] Prev sam mask logits: None
+[SAM2 Predictor] Retrieving image features for frame 1741642657.954055
+[Misc.py] Getting frame {idx}
+[Misc.py] Loading frame {idx} from video file
+[Misc.py] Opening video: /tmp/tmpl53z53km.mp4
+[Misc.py] Resizing to 1024x1024
+[Misc.py] Closing video reader
+[Misc.py] Caching frame {idx}
+[Misc.py] Frame {idx} cached
+[Misc.py] Returning frame {idx}
+INFO:     23.240.42.54:0 - "GET /api/tasks/9cb74991-f346-4e26-9730-be6a795801c4 HTTP/1.0" 200 OK
+[SAM2 Predictor] Retrieved image features for frame 1741642658.219959
+[SAM2 Predictor] Retrieved image features in 0.266s
+[SAM2 Predictor] Input type: none
+[SAM2 Predictor] Completed track_step in 0.702s
+[SAM2 Predictor] Filling holes with area threshold 8
+[SAM2 Predictor] Post-processed results in 0.002s
+[SAM2 Predictor] Total inference time for frame 6: 0.970s
+[SAM2 Predictor] Inference complete for frame 6
+[SAM2 Predictor] Stored output for frame 6 in non_cond_frame_outputs
+[SAM2 Predictor] Adding per-object output for frame 6
+[SAM2 Predictor] Marking frame 6 as tracked with reverse=False
+[SAM2 Predictor] About to process pred_masks for frame 6 with pred_masks type: <class 'torch.Tensor'>
+[SAM2 Predictor] Frame 6 got video_res_masks of type: <class 'torch.Tensor'>
+[SAM2 Predictor] video_res_masks is not list-like; contents: tensor([[[[-1.1398, -1.1398, -1.1398,  ..., -1.0376, -1.0376, -1.0376],
+          [-1.1398, -1.1398, -1.1398,  ..., -1.0376, -1.0376, -1.0376],
+          [-1.0667, -1.0667, -1.0667,  ..., -0.9071, -0.9071, -0.9071],
+          ...,
+          [ 1.1707,  1.1707,  1.1707,  ..., -0.1908, -0.1908, -0.1908],
+          [ 1.1444,  1.1444,  1.1444,  ..., -0.2586, -0.2586, -0.2586],
+          [ 1.1444,  1.1444,  1.1444,  ..., -0.2586, -0.2586, -0.2586]]]],
+       device='cuda:0')
+propagate in video:   1%|▍                                     | 6/499 [00:05<07:48,  1.05it/s][SAM2 Predictor] Processing frame 7
+[SAM2 Predictor] Frame 7 needs inference
+[SAM2 Predictor] Running single frame inference for frame 7
+[SAM2 Predictor] Running inference on frame 7, batch_size=1
+[SAM2 Predictor] Initial conditioning frame: False, reverse: False
+[SAM2 Predictor] Point inputs: None, Mask inputs: None
+[SAM2 Predictor] Prev sam mask logits: None
+[SAM2 Predictor] Retrieving image features for frame 1741642658.9284868
+[Misc.py] Getting frame {idx}
+[Misc.py] Loading frame {idx} from video file
+[Misc.py] Opening video: /tmp/tmpl53z53km.mp4
+[Misc.py] Resizing to 1024x1024
+[Misc.py] Closing video reader

@@ -392,76 +392,37 @@ class InferenceManager:
             
             ## --- Forward Propagation ---
             try:
-                print(f"[Manager.py] Calling forward propagation with start_frame_idx: {start_frame + 1} " 
-                      f"and tracking for {total_frames - (start_frame + 1)} frames")
-                raw_forward_masks = list(predictor.propagate_in_video(
-                    state, 
-                    start_frame_idx=start_frame + 1, 
-                    max_frame_num_to_track=total_frames - (start_frame + 1),
-                    reverse=False
-                ))
-                print(f"[Manager.py] Received {len(raw_forward_masks)} forward propagation items")
-
-                for idx, item in enumerate(raw_forward_masks):
-                    print(f"[Manager.py] Raw forward mask item {idx}: {item}")
-                    if not (isinstance(item, tuple) and len(item) == 3):
-                        print(f"[Manager.py] Warning: Unexpected data format at item {idx}: {item}")
+                print(f"[Manager.py] Calling forward propagation with start_frame_idx: {start_frame} " 
+                      f"and tracking for {total_frames - start_frame} frames")
                 
-                # Store forward propagated masks
-                for idx, frame_idx in enumerate(range(start_frame + 1, total_frames)):
-                    if idx < len(raw_forward_masks):
-                        try:
-                            mask_tensor = raw_forward_masks[idx][2]
-                            mask = mask_tensor.cpu().numpy() > 0.0
-                            masks_list[frame_idx] = mask
-                        except Exception as e:
-                            print(f"[Manager.py] Error processing mask for forward frame {frame_idx}: {e}")
-                print(f"[Manager.py] Forward propagation complete, generated masks for {len(raw_forward_masks)} frames")
-            except Exception as e:
-                print(f"[Manager.py] Error in propagate_in_video (forward): {e}")
-            
-            ## --- Backward Propagation ---
-            try:
+                # For forward propagation:
+                forward_masks = list(predictor.propagate_in_video(
+                    inference_state=state,
+                    start_frame_idx=start_frame,
+                    max_frame_num_to_track=(total_frames - start_frame),
+                    reverse=False,
+                ))
+                
+                # For backward propagation (if start_frame > 0):
+                backward_masks = []
                 if start_frame > 0:
-                    backward_start = start_frame - 1
-                    max_backward = start_frame  # Number of frames before start_frame
-                    print(f"[Manager.py] Backward propagating from frame {backward_start} for {max_backward} frames")
-                    
-                    raw_backward_masks = list(predictor.propagate_in_video(
-                        state,
-                        start_frame_idx=backward_start,
-                        max_frame_num_to_track=max_backward,
-                        reverse=True
+                    print(f"[Manager.py] Calling backward propagation with start_frame_idx: {start_frame}")
+                    backward_masks = list(predictor.propagate_in_video(
+                        inference_state=state,
+                        start_frame_idx=0,
+                        max_frame_num_to_track=start_frame,
+                        reverse=True,
                     ))
-                    backward_masks = []
-                    for idx, item in enumerate(raw_backward_masks):
-                        if isinstance(item, tuple) and len(item) == 3:
-                            frame_idx_yield, obj_ids, video_res_masks = item
-                            if not isinstance(video_res_masks, (list, tuple)):
-                                print(f"[Manager.py] Warning: video_res_masks for frame {frame_idx_yield} is not list-like: {type(video_res_masks)}")
-                                empty_tensor = torch.zeros((height, width), dtype=torch.uint8, device="cuda")
-                                backward_masks.append([empty_tensor])
-                            else:
-                                backward_masks.append(video_res_masks)
-                        else:
-                            print(f"[Manager.py] Warning: Unexpected item format during backward propagation: {item}. Using an empty mask.")
-                            empty_tensor = torch.zeros((height, width), dtype=torch.uint8, device="cuda")
-                            backward_masks.append([empty_tensor])
-                    
-                    for idx, frame_idx in enumerate(range(start_frame - 1, -1, -1)):
-                        if idx < len(backward_masks):
-                            try:
-                                mask_tensor = backward_masks[idx][0]
-                                mask = mask_tensor.cpu().numpy() > 0.0
-                                masks_list[frame_idx] = mask
-                            except Exception as e:
-                                print(f"[Manager.py] Error processing mask for backward frame {frame_idx}: {e}")
-                    print(f"[Manager.py] Backward propagation complete, generated masks for {len(backward_masks)} frames")
-                else:
-                    print(f"[Manager.py] Backward propagation not supported; skipping backward processing.")
+                
+                # Remap the results to original frame indices (if necessary)
+                forward_masks_remapped = [(start_frame + i, mask) for i, mask in enumerate(forward_masks)]
+                backward_masks_remapped = [(start_frame - 1 - i, mask) for i, mask in enumerate(backward_masks)]
+                
+                # Combine and sort the masks by frame index
+                raw_masks = forward_masks_remapped + backward_masks_remapped
+                raw_masks.sort(key=lambda x: x[0])
             except Exception as e:
-                print(f"[Manager.py] Backward propagation not supported; skipping backward processing.")
-                print(f"[Manager.py] Error details: {e}")
+                print(f"[Manager.py] Error in propagate_in_video: {e}")
             
             if progress_callback:
                 try:

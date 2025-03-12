@@ -411,7 +411,7 @@ const AnnotationLayer = ({
   );
 };
 
-export const VideoUpload = ({ onUploadSuccess, fetchVideos, initialVideo, fps }: VideoUploadProps) => {
+export const VideoUpload = ({ onUploadSuccess, fetchVideos, initialVideo,setInitialVideo, fps }: VideoUploadProps) => {
   const { setStatus } = useStatus();
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);

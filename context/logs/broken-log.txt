@@ -1,0 +1,572 @@
+Starting generate_full_masks for video_id: 1d52ffc1-c6f0-4b49-b515-f85be2551188
+Received request body: {'bbox': [126.6110183639399, 168.28046744574291, 985.6427378964942, 889.482470784641], 'points': {'positive': [[363.80634390651085, 918.330550918197], [376.62771285475793, 661.9031719532554], [424.7078464106845, 455.1585976627713], [506.4440734557596, 294.8914858096828], [524.0734557595994, 176.29382303839733], [613.8230383973289, 775.6928213689482], [617.0283806343907, 895.8931552587646], [602.6043405676127, 509.6494156928214], [778.89816360601, 653.889816360601], [891.0851419031719, 745.2420701168614], [1064.1736227045076, 769.2821368948247]], 'negative': [[927.9465776293823, 867.0450751252087], [687.5459098497496, 734.0233722871452], [788.5141903171954, 1027.3121869782972], [899.0984974958265, 1024.1068447412354], [1052.9549248747912, 971.2186978297162], [1052.9549248747912, 855.8263772954925], [921.5358931552588, 306.110183639399], [580.1669449081803, 173.08848080133555], [700.3672787979967, 328.5475792988314], [788.5141903171954, 431.118530884808], [1048.1469115191987, 663.5058430717863], [1059.3656093489149, 354.1903171953256], [1057.762938230384, 258.0300500834725], [259.6327212020033, 270.85141903171956], [224.3739565943239, 434.3238731218698], [205.14190317195326, 617.0283806343907], [176.29382303839733, 790.1168614357263], [168.28046744574291, 961.6026711185309]]}, 'super': True, 'method': 'preprocess', 'start_frame': 60}
+Parsed request data: bbox=[126.6110183639399, 168.28046744574291, 985.6427378964942, 889.482470784641] points={'positive': [[363.80634390651085, 918.330550918197], [376.62771285475793, 661.9031719532554], [424.7078464106845, 455.1585976627713], [506.4440734557596, 294.8914858096828], [524.0734557595994, 176.29382303839733], [613.8230383973289, 775.6928213689482], [617.0283806343907, 895.8931552587646], [602.6043405676127, 509.6494156928214], [778.89816360601, 653.889816360601], [891.0851419031719, 745.2420701168614], [1064.1736227045076, 769.2821368948247]], 'negative': [[927.9465776293823, 867.0450751252087], [687.5459098497496, 734.0233722871452], [788.5141903171954, 1027.3121869782972], [899.0984974958265, 1024.1068447412354], [1052.9549248747912, 971.2186978297162], [1052.9549248747912, 855.8263772954925], [921.5358931552588, 306.110183639399], [580.1669449081803, 173.08848080133555], [700.3672787979967, 328.5475792988314], [788.5141903171954, 431.118530884808], [1048.1469115191987, 663.5058430717863], [1059.3656093489149, 354.1903171953256], [1057.762938230384, 258.0300500834725], [259.6327212020033, 270.85141903171956], [224.3739565943239, 434.3238731218698], [205.14190317195326, 617.0283806343907], [176.29382303839733, 790.1168614357263], [168.28046744574291, 961.6026711185309]]} super=True method='preprocess' start_frame=60
+Querying video from database...
+Found video: 1d52ffc1-c6f0-4b49-b515-f85be2551188
+Video metadata: {'fps': 23.976023976023978, 'codec': 'h264', 'width': 1920, 'height': 1080, 'duration': 10.427083333333332, 'file_size': 20661792, 'frame_count': 250, 'upload_date': '2025-03-02T23:33:27.925278', 'uploaded_filename': 'SHOT 1.mp4'}
+Video duration: 10.427083333333332
+Created credits manager
+Getting cost estimate...
+Cost estimate: {'cost': 3.09, 'action': 'generate_masks', 'actionInfo': {'base': 1, 'super': 2, 'per_minute': 0.5, 'description': 'Generate video masks', 'refundable': True}, 'duration': 10.427083333333332, 'options': {'super': True}}
+Attempting to deduct credits...
+Successfully deducted 3.09 credits
+Creating task...
+Created task with id: 836ec796-3181-41d9-9344-4ed0aaa94c10
+Saved task to database
+INFO:app.main:Adding task 836ec796-3181-41d9-9344-4ed0aaa94c10 to background processing
+Request data:
+bbox=[126.6110183639399, 168.28046744574291, 985.6427378964942, 889.482470784641] points={'positive': [[363.80634390651085, 918.330550918197], [376.62771285475793, 661.9031719532554], [424.7078464106845, 455.1585976627713], [506.4440734557596, 294.8914858096828], [524.0734557595994, 176.29382303839733], [613.8230383973289, 775.6928213689482], [617.0283806343907, 895.8931552587646], [602.6043405676127, 509.6494156928214], [778.89816360601, 653.889816360601], [891.0851419031719, 745.2420701168614], [1064.1736227045076, 769.2821368948247]], 'negative': [[927.9465776293823, 867.0450751252087], [687.5459098497496, 734.0233722871452], [788.5141903171954, 1027.3121869782972], [899.0984974958265, 1024.1068447412354], [1052.9549248747912, 971.2186978297162], [1052.9549248747912, 855.8263772954925], [921.5358931552588, 306.110183639399], [580.1669449081803, 173.08848080133555], [700.3672787979967, 328.5475792988314], [788.5141903171954, 431.118530884808], [1048.1469115191987, 663.5058430717863], [1059.3656093489149, 354.1903171953256], [1057.762938230384, 258.0300500834725], [259.6327212020033, 270.85141903171956], [224.3739565943239, 434.3238731218698], [205.14190317195326, 617.0283806343907], [176.29382303839733, 790.1168614357263], [168.28046744574291, 961.6026711185309]]} super=True method='preprocess' start_frame=60
+start_frame 60
+Adding task to background tasks...
+Task added to background tasks
+Preparing response...
+Returning response: {'taskId': '836ec796-3181-41d9-9344-4ed0aaa94c10', 'creditCost': 3.09, 'remainingCredits': 3084, 'estimate': {'cost': 3.09, 'action': 'generate_masks', 'actionInfo': {'base': 1, 'super': 2, 'per_minute': 0.5, 'description': 'Generate video masks', 'refundable': True}, 'duration': 10.427083333333332, 'options': {'super': True}}}
+INFO:     23.240.42.54:0 - "POST /api/videos/1d52ffc1-c6f0-4b49-b515-f85be2551188/generate-masks HTTP/1.0" 200 OK
+INFO:app.tasks:Using fps: 23.976023976023978 from video metadata
+INFO:app.tasks:Super mode detected - checking for forward-reverse video
+[Manager.py] [MEMORY] After cleanup - CUDA Memory: 0.94GB allocated, 1.10GB reserved
+[Manager.py] [MEMORY] After cleanup - CUDA Memory: 0.94GB allocated, 1.10GB reserved
+[Manager.py] You art here though 0
+[Manager.py] You art here though 1
+[Manager.py] You art here though 2
+[Manager.py] [MEMORY] Initialized full predictor - CUDA Memory: 0.94GB allocated, 1.10GB reserved
+[Manager.py] [MEMORY] After initialize in generate_full_video_masks - CUDA Memory: 0.94GB allocated, 1.10GB reserved
+/tmp/tmpmyg_usp6.mp4
+[Manager.py] Video file opened successfully
+[Manager.py] Video info: 500 frames, 1920x1080
+[Manager.py] Progress callback provided: True
+[Manager.py] Using batch size: 10 for resolution 1920x1080
+[Manager.py] _generate_masks received progress_callback: True
+[Manager.py] [MEMORY] Before mask generation - CUDA Memory: 0.94GB allocated, 1.10GB reserved
+[Manager.py] [MEMORY] Before init_state - CUDA Memory: 0.94GB allocated, 1.10GB reserved
+Initializing inference state - production
+DEBUG: init_state() called for video: /tmp/tmpmyg_usp6.mp4
+DEBUG: Starting to load video frames with load_video_frames()...
+[Misc.py] Loading video frames
+[Misc.py] is_bytes False
+[Misc.py] is_str True
+[Misc.py] is_mp4_path True
+[Misc.py] Loading video frames from video file
+[Misc.py] Starting load_video_frames_from_video_file
+[Misc.py] Creating VideoFrameStream
+[Misc.py] Initializing VideoFrameStream
+[Misc.py] Opening video: /tmp/tmpmyg_usp6.mp4
+INFO:     23.240.42.54:0 - "GET /api/videos/1d52ffc1-c6f0-4b49-b515-f85be2551188/refresh-url HTTP/1.0" 200 OK
+[Misc.py] Getting video metadata
+[Misc.py] Closing video reader
+[Misc.py] Initialized video stream: 500 frames, 1920x1080
+[Misc.py] Getting video dimensions
+[Misc.py] Returning stream with dimensions {video_width}x{video_height}
+DEBUG: Video height: 1080
+DEBUG: Video width: 1920
+[Misc.py] Getting total frame count
+DEBUG: Finished loading video frames in 0.26 seconds.
+DEBUG: Loaded 500 frames; video resolution: 1920x1080
+[Misc.py] Getting total frame count
+[Misc.py] Getting frame {idx}
+[Misc.py] Loading frame {idx} from video file
+[Misc.py] Opening video: /tmp/tmpmyg_usp6.mp4
+[Misc.py] Resizing to 1024x1024
+INFO:     23.240.42.54:0 - "GET /api/videos/1d52ffc1-c6f0-4b49-b515-f85be2551188/refresh-url HTTP/1.0" 200 OK
+INFO:     23.240.42.54:0 - "GET /api/tasks/836ec796-3181-41d9-9344-4ed0aaa94c10 HTTP/1.0" 200 OK
+[Misc.py] Closing video reader
+[Misc.py] Caching frame {idx}
+[Misc.py] Frame {idx} cached
+[Misc.py] Returning frame {idx}
+INFO:     23.240.42.54:0 - "GET /api/videos/1d52ffc1-c6f0-4b49-b515-f85be2551188/refresh-url HTTP/1.0" 200 OK
+DEBUG: Visual backbone warmed up in 0.28 seconds.
+DEBUG: init_state() completed. Inference state details:
+        - Total frames: 500
+        - Video resolution: 1920x1080
+        - Offload video to CPU: False
+        - Offload state to CPU: False
+[Manager.py] [MEMORY] After init_state - CUDA Memory: 1.41GB allocated, 1.67GB reserved
+Updating task 836ec796-3181-41d9-9344-4ed0aaa94c10 progress: 0/500
+Updating task 836ec796-3181-41d9-9344-4ed0aaa94c10 progress: 0/500
+Task: <app.models.Task object at 0x7fe8993a2860>
+Task progress: 0.0
+INFO:app.tasks:Updated task 836ec796-3181-41d9-9344-4ed0aaa94c10 progress: 0.0%
+[Manager.py] Adding points/box to frame 60
+[SAM2 Predictor] Running inference on frame 60, batch_size=1
+[SAM2 Predictor] Initial conditioning frame: True, reverse: False
+[SAM2 Predictor] Point inputs: {'point_coords': tensor([[[ 67.5259, 159.5548],
+         [525.6761, 843.3611],
+         [194.0300, 870.7134],
+         [200.8681, 627.5823],
+         [226.5108, 431.5578],
+         [270.1035, 279.6008],
+         [279.5058, 167.1527],
+         [327.3723, 735.4717],
+         [329.0818, 849.4394],
+         [321.3890, 483.2231],
+         [415.4124, 619.9844],
+         [475.2454, 706.5999],
+         [567.5593, 729.3934],
+         [494.9048, 822.0872],
+         [366.6911, 695.9629],
+         [420.5409, 974.0441],
+         [479.5192, 971.0050],
+         [561.5760, 920.8592],
+         [561.5760, 811.4502],
+         [491.4858, 290.2378],
+         [309.4224, 164.1135],
+         [373.5292, 311.5118],
+         [420.5409, 408.7642],
+         [559.0117, 629.1019],
+         [564.9950, 335.8249],
+         [564.1403, 244.6507],
+         [138.4708, 256.8073],
+         [119.6661, 411.8034],
+         [109.4090, 585.0343],
+         [ 94.0234, 749.1479],
+         [ 89.7496, 911.7418]]], device='cuda:0'), 'point_labels': tensor([[2, 3, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+         0, 0, 0, 0, 0, 0, 0]], device='cuda:0', dtype=torch.int32)}, Mask inputs: None
+[SAM2 Predictor] Prev sam mask logits: None
+[SAM2 Predictor] Retrieving image features for frame 1741642014.5978808
+[Misc.py] Getting frame {idx}
+[Misc.py] Loading frame {idx} from video file
+[Misc.py] Opening video: /tmp/tmpmyg_usp6.mp4
+[Misc.py] Resizing to 1024x1024
+[Misc.py] Closing video reader
+[Misc.py] Caching frame {idx}
+[Misc.py] Frame {idx} cached
+[Misc.py] Returning frame {idx}
+[SAM2 Predictor] Retrieved image features for frame 1741642014.9965713
+[SAM2 Predictor] Retrieved image features in 0.399s
+[SAM2 Predictor] Input type: points
+INFO:     23.240.42.54:0 - "GET /api/tasks/836ec796-3181-41d9-9344-4ed0aaa94c10 HTTP/1.0" 200 OK
+[SAM2 Predictor] Completed track_step in 0.164s
+[SAM2 Predictor] Filling holes with area threshold 8
+/home/ec2-user/megaton-roto/backend/inference/sam2/sam2/sam2_video_predictor.py:1037: UserWarning: /home/ec2-user/megaton-roto/backend/inference/sam2/sam2/_C.so: undefined symbol: _ZN3c1015SmallVectorBaseIjE8grow_podEPKvmm
+
+Skipping the post-processing step due to the error above. You can still use SAM 2 and it's OK to ignore the error above, although some post-processing functionality may be limited (which doesn't affect the results in most cases; see https://github.com/facebookresearch/sam2/blob/main/INSTALL.md).
+  pred_masks_gpu = fill_holes_in_mask_scores(
+[SAM2 Predictor] Post-processed results in 0.003s
+[SAM2 Predictor] Total inference time for frame 60: 0.566s
+[Manager.py] [MEMORY] After add_new_points_or_box - CUDA Memory: 1.43GB allocated, 1.99GB reserved
+[Manager.py] Initial mask generated for frame 60
+[Manager.py] Processing video frames...
+[Manager.py] Calling forward propagation with start_frame_idx: 61 and tracking for 439 frames
+[SAM2 Predictor] Propagate in video preflight
+[SAM2 Predictor] Propagate in video preflight complete
+[SAM2 Predictor] Clear non-cond mem: False
+[SAM2 Predictor] Using provided start frame: 61
+[SAM2 Predictor] Will track 439 frames
+[SAM2 Predictor] Reverse tracking: False
+[SAM2 Predictor] End frame index (forward): 499
+[SAM2 Predictor] Processing range (forward): 61 to 499
+[SAM2 Predictor] Starting frame-by-frame processing with 439 frames
+propagate in video:   0%|                                              | 0/439 [00:00<?, ?it/s][SAM2 Predictor] Processing frame 61
+[SAM2 Predictor] Frame 61 needs inference
+[SAM2 Predictor] Running single frame inference for frame 61
+[SAM2 Predictor] Running inference on frame 61, batch_size=1
+[SAM2 Predictor] Initial conditioning frame: False, reverse: False
+[SAM2 Predictor] Point inputs: None, Mask inputs: None
+[SAM2 Predictor] Prev sam mask logits: None
+[SAM2 Predictor] Retrieving image features for frame 1741642015.1713786
+[Misc.py] Getting frame {idx}
+[Misc.py] Loading frame {idx} from video file
+[Misc.py] Opening video: /tmp/tmpmyg_usp6.mp4
+[Misc.py] Resizing to 1024x1024
+[Misc.py] Closing video reader
+[Misc.py] Caching frame {idx}
+[Misc.py] Frame {idx} cached
+[Misc.py] Returning frame {idx}
+[SAM2 Predictor] Retrieved image features for frame 1741642015.5672662
+[SAM2 Predictor] Retrieved image features in 0.396s
+[SAM2 Predictor] Input type: none
+propagate in video:   0%|                                              | 0/439 [00:00<?, ?it/s]
+[Manager.py] Error in propagate_in_video (forward): 60
+[Manager.py] Backward propagating from frame 59 for 60 frames
+[SAM2 Predictor] Propagate in video preflight
+[SAM2 Predictor] Propagate in video preflight complete
+[SAM2 Predictor] Clear non-cond mem: False
+[SAM2 Predictor] Using provided start frame: 59
+[SAM2 Predictor] Will track 60 frames
+[SAM2 Predictor] Reverse tracking: True
+[SAM2 Predictor] End frame index (reverse): 0
+[SAM2 Predictor] Processing range (reverse): 59 to -1
+[SAM2 Predictor] Starting frame-by-frame processing with 60 frames
+propagate in video:   0%|                                               | 0/60 [00:00<?, ?it/s][SAM2 Predictor] Processing frame 59
+[SAM2 Predictor] Frame 59 needs inference
+[SAM2 Predictor] Running single frame inference for frame 59
+[SAM2 Predictor] Running inference on frame 59, batch_size=1
+[SAM2 Predictor] Initial conditioning frame: False, reverse: True
+[SAM2 Predictor] Point inputs: None, Mask inputs: None
+[SAM2 Predictor] Prev sam mask logits: None
+[SAM2 Predictor] Retrieving image features for frame 1741642015.568049
+[Misc.py] Getting frame {idx}
+[Misc.py] Loading frame {idx} from video file
+[Misc.py] Opening video: /tmp/tmpmyg_usp6.mp4
+[Misc.py] Resizing to 1024x1024
+[Misc.py] Closing video reader
+[Misc.py] Caching frame {idx}
+[Misc.py] Frame {idx} cached
+[Misc.py] Returning frame {idx}
+INFO:     23.240.42.54:0 - "GET /api/tasks/836ec796-3181-41d9-9344-4ed0aaa94c10 HTTP/1.0" 200 OK
+[SAM2 Predictor] Retrieved image features for frame 1741642016.142903
+[SAM2 Predictor] Retrieved image features in 0.575s
+[SAM2 Predictor] Input type: none
+propagate in video:   0%|                                               | 0/60 [00:00<?, ?it/s]
+[Manager.py] Backward propagation not supported; skipping backward processing.
+[Manager.py] Error details: 58
+Updating task 836ec796-3181-41d9-9344-4ed0aaa94c10 progress: 1/500
+Updating task 836ec796-3181-41d9-9344-4ed0aaa94c10 progress: 1/500
+Task: <app.models.Task object at 0x7fe8993a2860>
+Task progress: 0.2
+INFO:app.tasks:Updated task 836ec796-3181-41d9-9344-4ed0aaa94c10 progress: 0.2%
+[Manager.py] [MEMORY] After collecting all masks - CUDA Memory: 1.06GB allocated, 2.61GB reserved
+[Manager.py] Collected masks for 1 frames
+[Manager.py] Generating final masks...
+[Manager.py] Processing batch 0-10...
+[Manager.py] [MEMORY] After batch 0-10 - CUDA Memory: 1.06GB allocated, 2.61GB reserved
+[Manager.py] Processing batch 10-20...
+[Manager.py] [MEMORY] After batch 10-20 - CUDA Memory: 1.06GB allocated, 2.61GB reserved
+[Manager.py] Processing batch 20-30...
+[Manager.py] [MEMORY] After batch 20-30 - CUDA Memory: 1.06GB allocated, 2.61GB reserved
+[Manager.py] Processing batch 30-40...
+[Manager.py] [MEMORY] After batch 30-40 - CUDA Memory: 1.06GB allocated, 2.61GB reserved
+[Manager.py] Processing batch 40-50...
+[Manager.py] [MEMORY] After batch 40-50 - CUDA Memory: 1.06GB allocated, 2.61GB reserved
+[Manager.py] Processing batch 50-60...
+[Manager.py] [MEMORY] After batch 50-60 - CUDA Memory: 1.06GB allocated, 2.61GB reserved
+[Manager.py] Processing batch 60-70...
+[Manager.py] Processing mask for obj_id 0, mask shape: (1080, 1920)
+INFO:     23.240.42.54:0 - "GET /api/tasks/836ec796-3181-41d9-9344-4ed0aaa94c10 HTTP/1.0" 200 OK
+[Manager.py] [MEMORY] After batch 60-70 - CUDA Memory: 1.06GB allocated, 2.61GB reserved
+[Manager.py] Processing batch 70-80...
+[Manager.py] [MEMORY] After batch 70-80 - CUDA Memory: 1.06GB allocated, 2.61GB reserved
+[Manager.py] Processing batch 80-90...
+[Manager.py] [MEMORY] After batch 80-90 - CUDA Memory: 1.06GB allocated, 2.61GB reserved
+[Manager.py] Processing batch 90-100...
+[Manager.py] [MEMORY] After batch 90-100 - CUDA Memory: 1.06GB allocated, 2.61GB reserved
+[Manager.py] Processing batch 100-110...
+[Manager.py] [MEMORY] After batch 100-110 - CUDA Memory: 1.06GB allocated, 2.61GB reserved
+[Manager.py] Processing batch 110-120...
+INFO:     23.240.42.54:0 - "GET /api/tasks/836ec796-3181-41d9-9344-4ed0aaa94c10 HTTP/1.0" 200 OK
+[Manager.py] [MEMORY] After batch 110-120 - CUDA Memory: 1.06GB allocated, 2.61GB reserved
+[Manager.py] Processing batch 120-130...
+[Manager.py] [MEMORY] After batch 120-130 - CUDA Memory: 1.06GB allocated, 2.61GB reserved
+[Manager.py] Processing batch 130-140...
+[Manager.py] [MEMORY] After batch 130-140 - CUDA Memory: 1.06GB allocated, 2.61GB reserved
+[Manager.py] Processing batch 140-150...
+[Manager.py] [MEMORY] After batch 140-150 - CUDA Memory: 1.06GB allocated, 2.61GB reserved
+[Manager.py] Processing batch 150-160...
+[Manager.py] [MEMORY] After batch 150-160 - CUDA Memory: 1.06GB allocated, 2.61GB reserved
+[Manager.py] Processing batch 160-170...
+[Manager.py] [MEMORY] After batch 160-170 - CUDA Memory: 1.06GB allocated, 2.61GB reserved
+[Manager.py] Processing batch 170-180...
+INFO:     23.240.42.54:0 - "GET /api/tasks/836ec796-3181-41d9-9344-4ed0aaa94c10 HTTP/1.0" 200 OK
+[Manager.py] [MEMORY] After batch 170-180 - CUDA Memory: 1.06GB allocated, 2.61GB reserved
+[Manager.py] Processing batch 180-190...
+[Manager.py] [MEMORY] After batch 180-190 - CUDA Memory: 1.06GB allocated, 2.61GB reserved
+[Manager.py] Processing batch 190-200...
+[Manager.py] [MEMORY] After batch 190-200 - CUDA Memory: 1.06GB allocated, 2.61GB reserved
+[Manager.py] Processing batch 200-210...
+[Manager.py] [MEMORY] After batch 200-210 - CUDA Memory: 1.06GB allocated, 2.61GB reserved
+[Manager.py] Processing batch 210-220...
+[Manager.py] [MEMORY] After batch 210-220 - CUDA Memory: 1.06GB allocated, 2.61GB reserved
+[Manager.py] Processing batch 220-230...
+[Manager.py] [MEMORY] After batch 220-230 - CUDA Memory: 1.06GB allocated, 2.61GB reserved
+[Manager.py] Processing batch 230-240...
+[Manager.py] [MEMORY] After batch 230-240 - CUDA Memory: 1.06GB allocated, 2.61GB reserved
+[Manager.py] Processing batch 240-250...
+[Manager.py] [MEMORY] After batch 240-250 - CUDA Memory: 1.06GB allocated, 2.61GB reserved
+[Manager.py] Processing batch 250-260...
+INFO:     23.240.42.54:0 - "GET /api/tasks/836ec796-3181-41d9-9344-4ed0aaa94c10 HTTP/1.0" 200 OK
+[Manager.py] [MEMORY] After batch 250-260 - CUDA Memory: 1.06GB allocated, 2.61GB reserved
+[Manager.py] Processing batch 260-270...
+[Manager.py] [MEMORY] After batch 260-270 - CUDA Memory: 1.06GB allocated, 2.61GB reserved
+[Manager.py] Processing batch 270-280...
+[Manager.py] [MEMORY] After batch 270-280 - CUDA Memory: 1.06GB allocated, 2.61GB reserved
+[Manager.py] Processing batch 280-290...
+[Manager.py] [MEMORY] After batch 280-290 - CUDA Memory: 1.06GB allocated, 2.61GB reserved
+[Manager.py] Processing batch 290-300...
+INFO:     23.240.42.54:0 - "GET /api/tasks/836ec796-3181-41d9-9344-4ed0aaa94c10 HTTP/1.0" 200 OK
+[Manager.py] [MEMORY] After batch 290-300 - CUDA Memory: 1.06GB allocated, 2.61GB reserved
+[Manager.py] Processing batch 300-310...
+[Manager.py] [MEMORY] After batch 300-310 - CUDA Memory: 1.06GB allocated, 2.61GB reserved
+[Manager.py] Processing batch 310-320...
+[Manager.py] [MEMORY] After batch 310-320 - CUDA Memory: 1.06GB allocated, 2.61GB reserved
+[Manager.py] Processing batch 320-330...
+[Manager.py] [MEMORY] After batch 320-330 - CUDA Memory: 1.06GB allocated, 2.61GB reserved
+[Manager.py] Processing batch 330-340...
+[Manager.py] [MEMORY] After batch 330-340 - CUDA Memory: 1.06GB allocated, 2.61GB reserved
+[Manager.py] Processing batch 340-350...
+[Manager.py] [MEMORY] After batch 340-350 - CUDA Memory: 1.06GB allocated, 2.61GB reserved
+[Manager.py] Processing batch 350-360...
+INFO:     23.240.42.54:0 - "GET /api/tasks/836ec796-3181-41d9-9344-4ed0aaa94c10 HTTP/1.0" 200 OK
+[Manager.py] [MEMORY] After batch 350-360 - CUDA Memory: 1.06GB allocated, 2.61GB reserved
+[Manager.py] Processing batch 360-370...
+[Manager.py] [MEMORY] After batch 360-370 - CUDA Memory: 1.06GB allocated, 2.61GB reserved
+[Manager.py] Processing batch 370-380...
+[Manager.py] [MEMORY] After batch 370-380 - CUDA Memory: 1.06GB allocated, 2.61GB reserved
+[Manager.py] Processing batch 380-390...
+[Manager.py] [MEMORY] After batch 380-390 - CUDA Memory: 1.06GB allocated, 2.61GB reserved
+[Manager.py] Processing batch 390-400...
+^@[Manager.py] [MEMORY] After batch 390-400 - CUDA Memory: 1.06GB allocated, 2.61GB reserved
+[Manager.py] Processing batch 400-410...
+[Manager.py] [MEMORY] After batch 400-410 - CUDA Memory: 1.06GB allocated, 2.61GB reserved
+[Manager.py] Processing batch 410-420...
+INFO:     23.240.42.54:0 - "GET /api/tasks/836ec796-3181-41d9-9344-4ed0aaa94c10 HTTP/1.0" 200 OK
+[Manager.py] [MEMORY] After batch 410-420 - CUDA Memory: 1.06GB allocated, 2.61GB reserved
+[Manager.py] Processing batch 420-430...
+[Manager.py] [MEMORY] After batch 420-430 - CUDA Memory: 1.06GB allocated, 2.61GB reserved
+[Manager.py] Processing batch 430-440...
+[Manager.py] [MEMORY] After batch 430-440 - CUDA Memory: 1.06GB allocated, 2.61GB reserved
+[Manager.py] Processing batch 440-450...
+[Manager.py] [MEMORY] After batch 440-450 - CUDA Memory: 1.06GB allocated, 2.61GB reserved
+[Manager.py] Processing batch 450-460...
+[Manager.py] [MEMORY] After batch 450-460 - CUDA Memory: 1.06GB allocated, 2.61GB reserved
+[Manager.py] Processing batch 460-470...
+INFO:     23.240.42.54:0 - "GET /api/tasks/836ec796-3181-41d9-9344-4ed0aaa94c10 HTTP/1.0" 200 OK
+[Manager.py] [MEMORY] After batch 460-470 - CUDA Memory: 1.06GB allocated, 2.61GB reserved
+[Manager.py] Processing batch 470-480...
+[Manager.py] [MEMORY] After batch 470-480 - CUDA Memory: 1.06GB allocated, 2.61GB reserved
+[Manager.py] Processing batch 480-490...
+[Manager.py] [MEMORY] After batch 480-490 - CUDA Memory: 1.06GB allocated, 2.61GB reserved
+[Manager.py] Processing batch 490-500...
+[Manager.py] [MEMORY] After batch 490-500 - CUDA Memory: 1.06GB allocated, 2.61GB reserved
+[Manager.py] Generated 500 frame masks
+[Manager.py] [MEMORY] After generating final masks - CUDA Memory: 1.06GB allocated, 2.61GB reserved
+[Manager.py] Available disk space: 40.61 GB
+[Manager.py] Processing chunk 0 to 100
+[Manager.py] Stacking chunk of size 100
+INFO:     23.240.42.54:0 - "GET /api/tasks/836ec796-3181-41d9-9344-4ed0aaa94c10 HTTP/1.0" 200 OK
+[Manager.py] Saving chunk to disk: /home/ec2-user/mask_chunks/8366ec15-e90d-41ec-b566-510be32c42af/chunk_0_100_11be0289.npy
+[Manager.py] Chunk saved to disk: /home/ec2-user/mask_chunks/8366ec15-e90d-41ec-b566-510be32c42af/chunk_0_100_11be0289.npy
+[Manager.py] Clearing memory for chunk 0-100
+[Manager.py] Memory cleared for chunk 0-100
+[Manager.py] Processing chunk 100 to 200
+[Manager.py] Stacking chunk of size 100
+[Manager.py] Saving chunk to disk: /home/ec2-user/mask_chunks/8366ec15-e90d-41ec-b566-510be32c42af/chunk_100_200_7790a455.npy
+INFO:     23.240.42.54:0 - "GET /api/tasks/836ec796-3181-41d9-9344-4ed0aaa94c10 HTTP/1.0" 200 OK
+[Manager.py] Chunk saved to disk: /home/ec2-user/mask_chunks/8366ec15-e90d-41ec-b566-510be32c42af/chunk_100_200_7790a455.npy
+[Manager.py] Clearing memory for chunk 100-200
+[Manager.py] Memory cleared for chunk 100-200
+[Manager.py] Processing chunk 200 to 300
+[Manager.py] Stacking chunk of size 100
+[Manager.py] Saving chunk to disk: /home/ec2-user/mask_chunks/8366ec15-e90d-41ec-b566-510be32c42af/chunk_200_300_06bff566.npy
+INFO:     23.240.42.54:0 - "GET /api/tasks/836ec796-3181-41d9-9344-4ed0aaa94c10 HTTP/1.0" 200 OK
+[Manager.py] Chunk saved to disk: /home/ec2-user/mask_chunks/8366ec15-e90d-41ec-b566-510be32c42af/chunk_200_300_06bff566.npy
+[Manager.py] Clearing memory for chunk 200-300
+[Manager.py] Memory cleared for chunk 200-300
+[Manager.py] Processing chunk 300 to 400
+[Manager.py] Stacking chunk of size 100
+[Manager.py] Saving chunk to disk: /home/ec2-user/mask_chunks/8366ec15-e90d-41ec-b566-510be32c42af/chunk_300_400_ed9c6f64.npy
+INFO:     23.240.42.54:0 - "GET /api/tasks/836ec796-3181-41d9-9344-4ed0aaa94c10 HTTP/1.0" 200 OK
+INFO:     23.240.42.54:0 - "GET /api/tasks/836ec796-3181-41d9-9344-4ed0aaa94c10 HTTP/1.0" 200 OK
+INFO:     23.240.42.54:0 - "GET /api/tasks/836ec796-3181-41d9-9344-4ed0aaa94c10 HTTP/1.0" 200 OK
+[Manager.py] Chunk saved to disk: /home/ec2-user/mask_chunks/8366ec15-e90d-41ec-b566-510be32c42af/chunk_300_400_ed9c6f64.npy
+[Manager.py] Clearing memory for chunk 300-400
+[Manager.py] Memory cleared for chunk 300-400
+[Manager.py] Processing chunk 400 to 500
+[Manager.py] Stacking chunk of size 100
+[Manager.py] Saving chunk to disk: /home/ec2-user/mask_chunks/8366ec15-e90d-41ec-b566-510be32c42af/chunk_400_500_cb13cd38.npy
+INFO:     23.240.42.54:0 - "GET /api/tasks/836ec796-3181-41d9-9344-4ed0aaa94c10 HTTP/1.0" 200 OK
+INFO:     23.240.42.54:0 - "GET /api/tasks/836ec796-3181-41d9-9344-4ed0aaa94c10 HTTP/1.0" 200 OK
+INFO:     23.240.42.54:0 - "GET /api/tasks/836ec796-3181-41d9-9344-4ed0aaa94c10 HTTP/1.0" 200 OK
+INFO:     23.240.42.54:0 - "GET /api/tasks/836ec796-3181-41d9-9344-4ed0aaa94c10 HTTP/1.0" 200 OK
+[Manager.py] Chunk saved to disk: /home/ec2-user/mask_chunks/8366ec15-e90d-41ec-b566-510be32c42af/chunk_400_500_cb13cd38.npy
+[Manager.py] Clearing memory for chunk 400-500
+[Manager.py] Memory cleared for chunk 400-500
+[Manager.py] All processing complete. Saved 5 chunks out of 5 expected
+[Manager.py] Returning 5 chunk paths
+[Manager.py] [MEMORY] After _generate_masks cleanup - CUDA Memory: 1.06GB allocated, 1.30GB reserved
+[Manager.py] Masks generation completed
+[Manager.py] [MEMORY] After masks generation - CUDA Memory: 0.94GB allocated, 1.30GB reserved
+[Manager.py] Result is a list of 5 chunk paths. Loading and combining.
+[Manager.py] Loaded chunk of shape (100, 1080, 1920, 3)
+[Manager.py] Loaded chunk of shape (100, 1080, 1920, 3)
+[Manager.py] Loaded chunk of shape (100, 1080, 1920, 3)
+[Manager.py] Loaded chunk of shape (100, 1080, 1920, 3)
+[Manager.py] Loaded chunk of shape (100, 1080, 1920, 3)
+[Manager.py] Successfully combined chunks into array of shape (500, 1080, 1920, 3)
+[Manager.py] Cleaning up 5 chunk files
+[Manager.py] Removed chunk file: /home/ec2-user/mask_chunks/8366ec15-e90d-41ec-b566-510be32c42af/chunk_0_100_11be0289.npy
+[Manager.py] Removed chunk file: /home/ec2-user/mask_chunks/8366ec15-e90d-41ec-b566-510be32c42af/chunk_100_200_7790a455.npy
+[Manager.py] Removed chunk file: /home/ec2-user/mask_chunks/8366ec15-e90d-41ec-b566-510be32c42af/chunk_200_300_06bff566.npy
+[Manager.py] Removed chunk file: /home/ec2-user/mask_chunks/8366ec15-e90d-41ec-b566-510be32c42af/chunk_300_400_ed9c6f64.npy
+[Manager.py] Removed chunk file: /home/ec2-user/mask_chunks/8366ec15-e90d-41ec-b566-510be32c42af/chunk_400_500_cb13cd38.npy
+[Manager.py] Chunk cleanup complete
+[Manager.py] [MEMORY] After cleanup - CUDA Memory: 0.94GB allocated, 1.10GB reserved
+INFO:app.tasks:Saving masks to video file, shape: (500, 1080, 1920, 3)
+INFO:app.tasks:Processed mask frames 0-99
+INFO:app.tasks:Processed mask frames 100-199
+INFO:app.tasks:Processed mask frames 200-299
+INFO:app.tasks:Masks saved to video file, cleared from memory
+INFO:app.utils.video:Processing super video: /tmp/tmpfsa6s80n.mp4
+ffmpeg version 4.4.2 Copyright (c) 2000-2021 the FFmpeg developers
+  built with gcc 12.3.0 (conda-forge gcc 12.3.0-2)
+  configuration: --prefix=/opt/conda/envs/pytorch310 --cc=/home/conda/feedstock_root/build_artifacts/ffmpeg_1697113881276/_build_env/bin/x86_64-conda-linux-gnu-cc --cxx=/home/conda/feedstock_root/build_artifacts/ffmpeg_1697113881276/_build_env/bin/x86_64-conda-linux-gnu-c++ --nm=/home/conda/feedstock_root/build_artifacts/ffmpeg_1697113881276/_build_env/bin/x86_64-conda-linux-gnu-nm --ar=/home/conda/feedstock_root/build_artifacts/ffmpeg_1697113881276/_build_env/bin/x86_64-conda-linux-gnu-ar --disable-doc --disable-openssl --enable-avresample --enable-demuxer=dash --enable-hardcoded-tables --enable-libfreetype --enable-libfontconfig --enable-libopenh264 --enable-gnutls --enable-libmp3lame --enable-libvpx --enable-pthreads --enable-vaapi --enable-gpl --enable-libx264 --enable-libx265 --enable-libaom --enable-libsvtav1 --enable-libxml2 --enable-pic --enable-shared --disable-static --enable-version3 --enable-zlib --pkg-config=/home/conda/feedstock_root/build_artifacts/ffmpeg_1697113881276/_build_env/bin/pkg-config
+  libavutil      56. 70.100 / 56. 70.100
+  libavcodec     58.134.100 / 58.134.100
+  libavformat    58. 76.100 / 58. 76.100
+  libavdevice    58. 13.100 / 58. 13.100
+  libavfilter     7.110.100 /  7.110.100
+  libavresample   4.  0.  0 /  4.  0.  0
+  libswscale      5.  9.100 /  5.  9.100
+  libswresample   3.  9.100 /  3.  9.100
+  libpostproc    55.  9.100 / 55.  9.100
+Input #0, mov,mp4,m4a,3gp,3g2,mj2, from '/tmp/tmpfsa6s80n.mp4':
+  Metadata:
+    major_brand     : isom
+    minor_version   : 512
+    compatible_brands: isomiso2mp41
+    encoder         : Lavf59.27.100
+  Duration: 00:00:12.51, start: 0.000000, bitrate: 698 kb/s
+  Stream #0:0(und): Video: mpeg4 (Simple Profile) (mp4v / 0x7634706D), yuv420p, 1920x1080 [SAR 1:1 DAR 16:9], 696 kb/s, 23.98 fps, 23.98 tbr, 23976 tbn, 2997 tbc (default)
+    Metadata:
+      handler_name    : VideoHandler
+      vendor_id       : [0][0][0][0]
+Stream mapping:
+  Stream #0:0 -> #0:0 (mpeg4 (native) -> h264 (libx264))
+Press [q] to stop, [?] for help
+[libx264 @ 0x55c1d1926dc0] using SAR=1/1
+[libx264 @ 0x55c1d1926dc0] using cpu capabilities: MMX2 SSE2Fast SSSE3 SSE4.2 AVX FMA3 BMI2 AVX2 AVX512
+[libx264 @ 0x55c1d1926dc0] profile High, level 4.0, 4:2:0, 8-bit
+[libx264 @ 0x55c1d1926dc0] 264 - core 164 r3095 baee400 - H.264/MPEG-4 AVC codec - Copyleft 2003-2022 - http://www.videolan.org/x264.html - options: cabac=1 ref=3 deblock=1:0:0 analyse=0x3:0x113 me=hex subme=7 psy=1 psy_rd=1.00:0.00 mixed_ref=1 me_range=16 chroma_me=1 trellis=1 8x8dct=1 cqm=0 deadzone=21,11 fast_pskip=1 chroma_qp_offset=-2 threads=6 lookahead_threads=1 sliced_threads=0 nr=0 decimate=1 interlaced=0 bluray_compat=0 constrained_intra=0 bframes=3 b_pyramid=2 b_adapt=1 b_bias=0 direct=1 weightb=1 open_gop=0 weightp=2 keyint=250 keyint_min=23 scenecut=40 intra_refresh=0 rc_lookahead=40 rc=crf mbtree=1 crf=23.0 qcomp=0.60 qpmin=0 qpmax=69 qpstep=4 ip_ratio=1.40 aq=1:1.00
+Output #0, mp4, to '/tmp/tmpdzyelh4f.mp4':
+  Metadata:
+    major_brand     : isom
+    minor_version   : 512
+    compatible_brands: isomiso2mp41
+    encoder         : Lavf58.76.100
+  Stream #0:0(und): Video: h264 (avc1 / 0x31637661), yuv420p(progressive), 1920x1080 [SAR 1:1 DAR 16:9], q=2-31, 23.98 fps, 11988 tbn (default)
+    Metadata:
+      handler_name    : VideoHandler
+      vendor_id       : [0][0][0][0]
+      encoder         : Lavc58.134.100 libx264
+    Side data:
+      cpb: bitrate max/min/avg: 0/0/0 buffer size: 0 vbv_delay: N/A
+frame=   59 fps= 50 q=28.0 size=       0kB time=00:00:00.25 bitrate=   1.5kbits/s speed=0.214x frame=  123 fps= 74 q=28.0 size=       0kB time=00:00:02.91 bitrate=   0.1kbits/s speed=1.75x  [mp4 @ 0x55c1d1928240] Starting second pass: moving the moov atom to the beginning of the file
+frame=  151 fps= 70 q=-1.0 Lsize=      14kB time=00:00:06.17 bitrate=  18.7kbits/s speed=2.88x    
+video:11kB audio:0kB subtitle:0kB other streams:0kB global headers:0kB muxing overhead: 22.931946%
+[libx264 @ 0x55c1d1926dc0] frame I:1     Avg QP: 9.00  size:   429
+[libx264 @ 0x55c1d1926dc0] frame P:38    Avg QP: 9.18  size:    77
+[libx264 @ 0x55c1d1926dc0] frame B:112   Avg QP:12.67  size:    69
+[libx264 @ 0x55c1d1926dc0] consecutive B-frames:  0.7%  1.3%  0.0% 98.0%
+[libx264 @ 0x55c1d1926dc0] mb I  I16..4: 100.0%  0.0%  0.0%
+[libx264 @ 0x55c1d1926dc0] mb P  I16..4:  0.0%  0.0%  0.0%  P16..4:  0.0%  0.0%  0.0%  0.0%  0.0%    skip:100.0%
+[libx264 @ 0x55c1d1926dc0] mb B  I16..4:  0.0%  0.0%  0.0%  B16..8:  0.0%  0.0%  0.0%  direct: 0.0%  skip:100.0%
+[libx264 @ 0x55c1d1926dc0] 8x8 transform intra:0.0%
+[libx264 @ 0x55c1d1926dc0] coded y,uvDC,uvAC intra: 0.0% 0.0% 0.0% inter: 0.0% 0.0% 0.0%
+[libx264 @ 0x55c1d1926dc0] i16 v,h,dc,p: 99%  0%  1%  0%
+[libx264 @ 0x55c1d1926dc0] i8c dc,h,v,p: 100%  0%  0%  0%
+[libx264 @ 0x55c1d1926dc0] Weighted P-Frames: Y:0.0% UV:0.0%
+[libx264 @ 0x55c1d1926dc0] kb/s:14.02
+INFO:app.utils.video:Super video processing completed successfully
+INFO:app.tasks:Starting S3 upload...
+INFO:app.tasks:Object users/247cbd93-9935-4b2c-b0ac-eadd8872c0c8/masks/1d52ffc1-c6f0-4b49-b515-f85be2551188_mask.mp4 exists in S3, will overwrite
+INFO:app.tasks:S3 upload completed for users/247cbd93-9935-4b2c-b0ac-eadd8872c0c8/masks/1d52ffc1-c6f0-4b49-b515-f85be2551188_mask.mp4
+INFO:app.utils.video:Converting video to H.264: /tmp/tmp7wc9d0ps.mp4
+ffmpeg version 4.4.2 Copyright (c) 2000-2021 the FFmpeg developers
+  built with gcc 12.3.0 (conda-forge gcc 12.3.0-2)
+  configuration: --prefix=/opt/conda/envs/pytorch310 --cc=/home/conda/feedstock_root/build_artifacts/ffmpeg_1697113881276/_build_env/bin/x86_64-conda-linux-gnu-cc --cxx=/home/conda/feedstock_root/build_artifacts/ffmpeg_1697113881276/_build_env/bin/x86_64-conda-linux-gnu-c++ --nm=/home/conda/feedstock_root/build_artifacts/ffmpeg_1697113881276/_build_env/bin/x86_64-conda-linux-gnu-nm --ar=/home/conda/feedstock_root/build_artifacts/ffmpeg_1697113881276/_build_env/bin/x86_64-conda-linux-gnu-ar --disable-doc --disable-openssl --enable-avresample --enable-demuxer=dash --enable-hardcoded-tables --enable-libfreetype --enable-libfontconfig --enable-libopenh264 --enable-gnutls --enable-libmp3lame --enable-libvpx --enable-pthreads --enable-vaapi --enable-gpl --enable-libx264 --enable-libx265 --enable-libaom --enable-libsvtav1 --enable-libxml2 --enable-pic --enable-shared --disable-static --enable-version3 --enable-zlib --pkg-config=/home/conda/feedstock_root/build_artifacts/ffmpeg_1697113881276/_build_env/bin/pkg-config
+  libavutil      56. 70.100 / 56. 70.100
+  libavcodec     58.134.100 / 58.134.100
+  libavformat    58. 76.100 / 58. 76.100
+  libavdevice    58. 13.100 / 58. 13.100
+  libavfilter     7.110.100 /  7.110.100
+  libavresample   4.  0.  0 /  4.  0.  0
+  libswscale      5.  9.100 /  5.  9.100
+  libswresample   3.  9.100 /  3.  9.100
+  libpostproc    55.  9.100 / 55.  9.100
+Input #0, mov,mp4,m4a,3gp,3g2,mj2, from '/tmp/tmp7wc9d0ps.mp4':
+  Metadata:
+    major_brand     : isom
+    minor_version   : 512
+    compatible_brands: isomiso2mp41
+    encoder         : Lavf59.27.100
+  Duration: 00:00:06.30, start: 0.000000, bitrate: 553 kb/s
+  Stream #0:0(und): Video: mpeg4 (Simple Profile) (mp4v / 0x7634706D), yuv420p, 1920x1080 [SAR 1:1 DAR 16:9], 551 kb/s, 23.98 fps, 23.98 tbr, 23976 tbn, 2997 tbc (default)
+    Metadata:
+      handler_name    : VideoHandler
+      vendor_id       : [0][0][0][0]
+Stream mapping:
+  Stream #0:0 -> #0:0 (mpeg4 (native) -> h264 (libx264))
+Press [q] to stop, [?] for help
+[libx264 @ 0x55e13310b280] using SAR=1/1
+[libx264 @ 0x55e13310b280] using cpu capabilities: MMX2 SSE2Fast SSSE3 SSE4.2 AVX FMA3 BMI2 AVX2 AVX512
+[libx264 @ 0x55e13310b280] profile High, level 4.0, 4:2:0, 8-bit
+[libx264 @ 0x55e13310b280] 264 - core 164 r3095 baee400 - H.264/MPEG-4 AVC codec - Copyleft 2003-2022 - http://www.videolan.org/x264.html - options: cabac=1 ref=3 deblock=1:0:0 analyse=0x3:0x113 me=hex subme=7 psy=1 psy_rd=1.00:0.00 mixed_ref=1 me_range=16 chroma_me=1 trellis=1 8x8dct=1 cqm=0 deadzone=21,11 fast_pskip=1 chroma_qp_offset=-2 threads=6 lookahead_threads=1 sliced_threads=0 nr=0 decimate=1 interlaced=0 bluray_compat=0 constrained_intra=0 bframes=3 b_pyramid=2 b_adapt=1 b_bias=0 direct=1 weightb=1 open_gop=0 weightp=2 keyint=250 keyint_min=23 scenecut=40 intra_refresh=0 rc_lookahead=40 rc=crf mbtree=1 crf=23.0 qcomp=0.60 qpmin=0 qpmax=69 qpstep=4 ip_ratio=1.40 aq=1:1.00
+Output #0, mp4, to '/tmp/tmp6r4epj4l.mp4':
+  Metadata:
+    major_brand     : isom
+    minor_version   : 512
+    compatible_brands: isomiso2mp41
+    encoder         : Lavf58.76.100
+  Stream #0:0(und): Video: h264 (avc1 / 0x31637661), yuv420p(progressive), 1920x1080 [SAR 1:1 DAR 16:9], q=2-31, 23.98 fps, 11988 tbn (default)
+    Metadata:
+      handler_name    : VideoHandler
+      vendor_id       : [0][0][0][0]
+      encoder         : Lavc58.134.100 libx264
+    Side data:
+      cpb: bitrate max/min/avg: 0/0/0 buffer size: 0 vbv_delay: N/A
+frame=   55 fps=0.0 q=28.0 size=       0kB time=00:00:00.08 bitrate=   4.6kbits/s speed=0.161x frame=  111 fps=109 q=28.0 size=       0kB time=00:00:02.41 bitrate=   0.2kbits/s speed=2.37x  [mp4 @ 0x55e13310c700] Starting second pass: moving the moov atom to the beginning of the file
+frame=  151 fps= 93 q=-1.0 Lsize=      14kB time=00:00:06.17 bitrate=  18.7kbits/s speed=3.81x    
+video:11kB audio:0kB subtitle:0kB other streams:0kB global headers:0kB muxing overhead: 22.933903%
+[libx264 @ 0x55e13310b280] frame I:1     Avg QP: 9.00  size:   428
+[libx264 @ 0x55e13310b280] frame P:38    Avg QP: 9.18  size:    77
+[libx264 @ 0x55e13310b280] frame B:112   Avg QP:12.67  size:    69
+[libx264 @ 0x55e13310b280] consecutive B-frames:  0.7%  1.3%  0.0% 98.0%
+[libx264 @ 0x55e13310b280] mb I  I16..4: 100.0%  0.0%  0.0%
+[libx264 @ 0x55e13310b280] mb P  I16..4:  0.0%  0.0%  0.0%  P16..4:  0.0%  0.0%  0.0%  0.0%  0.0%    skip:100.0%
+[libx264 @ 0x55e13310b280] mb B  I16..4:  0.0%  0.0%  0.0%  B16..8:  0.0%  0.0%  0.0%  direct: 0.0%  skip:100.0%
+[libx264 @ 0x55e13310b280] 8x8 transform intra:0.0%
+[libx264 @ 0x55e13310b280] coded y,uvDC,uvAC intra: 0.0% 0.0% 0.0% inter: 0.0% 0.0% 0.0%
+[libx264 @ 0x55e13310b280] i16 v,h,dc,p: 99%  0%  1%  0%
+[libx264 @ 0x55e13310b280] i8c dc,h,v,p: 100%  0%  0%  0%
+[libx264 @ 0x55e13310b280] Weighted P-Frames: Y:0.0% UV:0.0%
+[libx264 @ 0x55e13310b280] kb/s:14.02
+INFO:app.utils.video:H.264 conversion completed successfully
+INFO:app.tasks:Greenscreen video created and uploaded: greenscreen/1d52ffc1-c6f0-4b49-b515-f85be2551188_greenscreen.mp4
+[Manager.py] [MEMORY] After cleanup - CUDA Memory: 0.94GB allocated, 1.10GB reserved
+INFO:     23.240.42.54:0 - "GET /api/tasks/836ec796-3181-41d9-9344-4ed0aaa94c10 HTTP/1.0" 200 OK
+INFO:     23.240.42.54:0 - "GET /api/tasks/836ec796-3181-41d9-9344-4ed0aaa94c10 HTTP/1.0" 200 OK
+INFO:     23.240.42.54:0 - "GET /api/tasks/836ec796-3181-41d9-9344-4ed0aaa94c10 HTTP/1.0" 200 OK
+INFO:     23.240.42.54:0 - "GET /api/tasks/836ec796-3181-41d9-9344-4ed0aaa94c10 HTTP/1.0" 200 OK
+INFO:     23.240.42.54:0 - "GET /api/tasks/836ec796-3181-41d9-9344-4ed0aaa94c10 HTTP/1.0" 200 OK
+INFO:     23.240.42.54:0 - "GET /api/videos HTTP/1.0" 200 OK
+INFO:     23.240.42.54:0 - "GET /api/tasks/836ec796-3181-41d9-9344-4ed0aaa94c10 HTTP/1.0" 200 OK
+INFO:     23.240.42.54:0 - "GET /api/videos HTTP/1.0" 200 OK
+INFO:     23.240.42.54:0 - "GET /api/tasks/836ec796-3181-41d9-9344-4ed0aaa94c10 HTTP/1.0" 200 OK
+INFO:     23.240.42.54:0 - "GET /api/tasks/836ec796-3181-41d9-9344-4ed0aaa94c10 HTTP/1.0" 200 OK
+INFO:     23.240.42.54:0 - "GET /api/videos HTTP/1.0" 200 OK
+INFO:     23.240.42.54:0 - "GET /api/tasks/836ec796-3181-41d9-9344-4ed0aaa94c10 HTTP/1.0" 200 OK
+INFO:     23.240.42.54:0 - "GET /api/tasks/836ec796-3181-41d9-9344-4ed0aaa94c10 HTTP/1.0" 200 OK
+INFO:     23.240.42.54:0 - "GET /api/videos HTTP/1.0" 200 OK
+INFO:     23.240.42.54:0 - "GET /api/tasks/836ec796-3181-41d9-9344-4ed0aaa94c10 HTTP/1.0" 200 OK
+INFO:     23.240.42.54:0 - "GET /api/tasks/836ec796-3181-41d9-9344-4ed0aaa94c10 HTTP/1.0" 200 OK
+INFO:     23.240.42.54:0 - "GET /api/tasks/836ec796-3181-41d9-9344-4ed0aaa94c10 HTTP/1.0" 200 OK
+INFO:     23.240.42.54:0 - "GET /api/tasks/836ec796-3181-41d9-9344-4ed0aaa94c10 HTTP/1.0" 200 OK
+INFO:     23.240.42.54:0 - "GET /api/videos HTTP/1.0" 200 OK
+INFO:     23.240.42.54:0 - "GET /api/tasks/836ec796-3181-41d9-9344-4ed0aaa94c10 HTTP/1.0" 200 OK
+INFO:     23.240.42.54:0 - "GET /api/tasks/836ec796-3181-41d9-9344-4ed0aaa94c10 HTTP/1.0" 200 OK
+INFO:     23.240.42.54:0 - "GET /api/videos HTTP/1.0" 200 OK
+INFO:     23.240.42.54:0 - "GET /api/tasks/836ec796-3181-41d9-9344-4ed0aaa94c10 HTTP/1.0" 200 OK
+INFO:     23.240.42.54:0 - "GET /api/tasks/836ec796-3181-41d9-9344-4ed0aaa94c10 HTTP/1.0" 200 OK
+INFO:     23.240.42.54:0 - "GET /api/videos HTTP/1.0" 200 OK
+INFO:     23.240.42.54:0 - "GET /api/tasks/836ec796-3181-41d9-9344-4ed0aaa94c10 HTTP/1.0" 200 OK
+INFO:     23.240.42.54:0 - "GET /api/tasks/836ec796-3181-41d9-9344-4ed0aaa94c10 HTTP/1.0" 200 OK
+INFO:     23.240.42.54:0 - "GET /api/videos HTTP/1.0" 200 OK
+INFO:     23.240.42.54:0 - "GET /api/tasks/836ec796-3181-41d9-9344-4ed0aaa94c10 HTTP/1.0" 200 OK
+INFO:     23.240.42.54:0 - "GET /api/tasks/836ec796-3181-41d9-9344-4ed0aaa94c10 HTTP/1.0" 200 OK
+INFO:     23.240.42.54:0 - "GET /api/videos HTTP/1.0" 200 OK
+INFO:     23.240.42.54:0 - "GET /api/tasks/836ec796-3181-41d9-9344-4ed0aaa94c10 HTTP/1.0" 200 OK
+INFO:     23.240.42.54:0 - "GET /api/tasks/836ec796-3181-41d9-9344-4ed0aaa94c10 HTTP/1.0" 200 OK
+INFO:     23.240.42.54:0 - "GET /api/videos HTTP/1.0" 200 OK
+INFO:     23.240.42.54:0 - "GET /api/videos HTTP/1.0" 200 OK
+INFO:     23.240.42.54:0 - "GET /api/videos HTTP/1.0" 200 OK
+INFO:     23.240.42.54:0 - "GET /api/videos HTTP/1.0" 200 OK
+INFO:     23.240.42.54:0 - "GET /api/videos HTTP/1.0" 200 OK
+INFO:     23.240.42.54:0 - "GET /api/videos HTTP/1.0" 200 OK
+INFO:     23.240.42.54:0 - "GET /api/videos HTTP/1.0" 200 OK
+INFO:     23.240.42.54:0 - "GET /api/videos HTTP/1.0" 200 OK
+INFO:     23.240.42.54:0 - "GET /api/videos HTTP/1.0" 200 OK
+INFO:     23.240.42.54:0 - "GET /api/videos HTTP/1.0" 200 OK
+INFO:     23.240.42.54:0 - "GET /api/videos HTTP/1.0" 200 OK
+INFO:     23.240.42.54:0 - "GET /api/videos HTTP/1.0" 200 OK
+INFO:     23.240.42.54:0 - "GET /api/videos HTTP/1.0" 200 OK
+INFO:     23.240.42.54:0 - "GET /api/videos HTTP/1.0" 200 OK
+INFO:     23.240.42.54:0 - "GET /api/videos HTTP/1.0" 200 OK

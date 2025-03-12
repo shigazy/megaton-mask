@@ -67,6 +67,8 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000 --reload
 
 cd backend (dev)
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8001 --reload
+sudo pkill -f uvicorn && cd ~/megaton-roto-dev/backend && uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload
+
 ## Contributing
 
 1. Create a feature branch
