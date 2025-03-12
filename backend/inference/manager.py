@@ -15,6 +15,7 @@ import gc
 import time
 import shutil
 import uuid
+from .utils.jpg_sequence import download_jpg_sequence, prepare_sam2_jpg_sequence
 
 sys.path.append("./sam2")
 from sam2.build_sam import build_sam2_video_predictor
@@ -229,9 +230,12 @@ class InferenceManager:
         super_mode: bool = False,
         method: str = "default",
         start_frame: int = 0,
-        progress_callback = None
+        progress_callback = None,
+        jpg_dir_key: Optional[str] = None  # New parameter
     ) -> np.ndarray:
-        """Generate masks for all frames in a video"""
+        """Generate masks for all frames in a video or JPG sequence"""
+        temp_dirs = []  # Track temporary directories to clean up
+        
         try:
             # Clear memory before starting
             self.cleanup()
@@ -241,19 +245,56 @@ class InferenceManager:
             # Use regular model for full masks
             predictor = await self.initialize(is_preview=False)
             self.log_memory_usage("After initialize in generate_full_video_masks")
-            print(video_path)
-            # Get video info
-            cap = cv2.VideoCapture(video_path)
-            if not cap.isOpened():
-                print("[Manager.py] Error: Unable to open video file")
-            else:
-                print("[Manager.py] Video file opened successfully")
-            total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-            width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-            height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
             
-            print(f"[Manager.py] Video info: {total_frames} frames, {width}x{height}")
-            cap.release()
+            # Get video info (either from video file or first JPG)
+            if jpg_dir_key:
+                print(f"[Manager.py] Processing from JPG sequence: {jpg_dir_key}")
+                # Download the JPG sequence from S3
+                jpg_dir = download_jpg_sequence(jpg_dir_key)
+                temp_dirs.append(jpg_dir)
+                
+                # Get the frame count and dimensions from the JPG sequence
+                jpg_files = sorted([f for f in os.listdir(jpg_dir) if f.endswith('.jpg')])
+                total_frames = len(jpg_files)
+                
+                if total_frames == 0:
+                    raise ValueError(f"No JPG frames found in directory: {jpg_dir}")
+                    
+                # Get dimensions from the first frame
+                first_frame = cv2.imread(os.path.join(jpg_dir, jpg_files[0]))
+                height, width = first_frame.shape[:2]
+                
+                print(f"[Manager.py] JPG sequence info: {total_frames} frames, {width}x{height}")
+                
+                # Create a reordered sequence for SAM2
+                sam2_dir, sam2_to_original = prepare_sam2_jpg_sequence(
+                    jpg_dir, 
+                    total_frames, 
+                    start_frame
+                )
+                temp_dirs.append(sam2_dir)
+                
+                # SAM2 will use this directory path instead of a video
+                process_path = sam2_dir
+                
+            else:
+                # Fall back to using the video file
+                print(f"[Manager.py] Processing from video file: {video_path}")
+                cap = cv2.VideoCapture(video_path)
+                if not cap.isOpened():
+                    print("[Manager.py] Error: Unable to open video file")
+                else:
+                    print("[Manager.py] Video file opened successfully")
+                total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+                width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+                height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+                cap.release()
+                
+                print(f"[Manager.py] Video info: {total_frames} frames, {width}x{height}")
+                process_path = video_path
+                
+                # Create frame mapping for regular video processing
+                _, sam2_to_original = create_sam2_frame_mapping(total_frames, start_frame)
             
             # Add debug print to verify callback is passed correctly
             print(f"[Manager.py] Progress callback provided: {progress_callback is not None}")
@@ -269,57 +310,36 @@ class InferenceManager:
             # Run the heavy computation in a thread pool
             loop = asyncio.get_event_loop()
             result = await loop.run_in_executor(None, self._generate_masks,
-                predictor, video_path, points, bbox, super_mode, method,
-                total_frames, height, width, batch_size, start_frame, progress_callback)
+                predictor, process_path, points, bbox, super_mode, method,
+                total_frames, height, width, batch_size, 0,  # Use 0 as start_frame for SAM2
+                progress_callback, sam2_to_original)  # Pass the mapping
             
             print("[Manager.py] Masks generation completed")
             self.log_memory_usage("After masks generation")
             
-            # Handle both numpy arrays and lists of paths
-            if isinstance(result, list) and all(isinstance(path, str) for path in result):
-                # The result is a list of chunk paths
-                print(f"[Manager.py] Result is a list of {len(result)} chunk paths. Loading and combining.")
-                
-                # Load and combine chunks with better error handling
-                try:
-                    chunks = []
-                    for path in result:
-                        if os.path.exists(path):
-                            chunk = np.load(path)
-                            chunks.append(chunk)
-                            print(f"[Manager.py] Loaded chunk of shape {chunk.shape}")
-                        else:
-                            print(f"[Manager.py] Warning: Chunk file not found: {path}")
-                    
-                    if chunks:
-                        combined_array = np.concatenate(chunks, axis=0)
-                        print(f"[Manager.py] Successfully combined chunks into array of shape {combined_array.shape}")
-                    else:
-                        print("[Manager.py] No valid chunks found. Creating empty array.")
-                        combined_array = np.zeros((total_frames, height, width), dtype=np.uint8)
-                        
-                    # Clean up temp files
-                    self.cleanup_saved_chunks(result)
-                    return combined_array
-                except Exception as e:
-                    print(f"[Manager.py] Error combining chunks: {e}")
-                    import traceback
-                    traceback.print_exc()
-                    # Return an empty array as fallback
-                    return np.zeros((total_frames, height, width), dtype=np.uint8)
-            
+            # The result will be correctly ordered based on the original frames
             return result
 
         except Exception as e:
             print(f"[Manager.py] Error in generate_full_video_masks: {e}")
             raise
         finally:
+            # Clean up temporary directories
+            for temp_dir in temp_dirs:
+                try:
+                    if os.path.exists(temp_dir):
+                        shutil.rmtree(temp_dir)
+                        print(f"[Manager.py] Removed temporary directory: {temp_dir}")
+                except Exception as e:
+                    print(f"[Manager.py] Error removing temporary directory {temp_dir}: {e}")
+            
             self.cleanup()
             torch.cuda.empty_cache()
             gc.collect()
 
     def _generate_masks(self, predictor, video_path, points, bbox, super_mode, method,
-                       total_frames, height, width, batch_size=25, start_frame=0, progress_callback=None):
+                       total_frames, height, width, batch_size=25, start_frame=0, 
+                       progress_callback=None, sam2_to_original=None):
         """Non-async version of mask generation to run in thread pool"""
         try:
             print(f"[Manager.py] _generate_masks received progress_callback: {progress_callback is not None}")
@@ -327,8 +347,11 @@ class InferenceManager:
             gc.collect()
             self.log_memory_usage("Before mask generation")
             
+            # Final masks storage
+            final_masks = []
+            
             with torch.inference_mode(), torch.autocast("cuda", dtype=torch.float16):
-                # Initialize state with video
+                # Initialize state with video path (which could be a JPG sequence directory)
                 start_time = time.time()
                 try:
                     self.log_memory_usage("Before init_state")
@@ -364,12 +387,12 @@ class InferenceManager:
                 points_array = np.array(all_points) if all_points else None
                 labels_array = np.array(all_labels) if all_labels else None
                 
-                # Process the initial frame
+                # Process the initial frame (now always frame 0 in SAM2's perspective)
                 try:
-                    print(f"[Manager.py] Adding points/box to frame {start_frame}")
+                    print(f"[Manager.py] Adding points/box to frame 0")
                     frame_idx, obj_ids, initial_masks = predictor.add_new_points_or_box(
                         state,
-                        frame_idx=start_frame,
+                        frame_idx=0,  # Always use frame 0 for SAM2
                         obj_id=0,
                         points=points_array,
                         labels=labels_array,
@@ -378,105 +401,142 @@ class InferenceManager:
                     self.log_memory_usage("After add_new_points_or_box")
                     
                     if initial_masks is not None and len(initial_masks) > 0:
-                        masks_list[start_frame] = initial_masks[0][0].cpu().numpy() > 0.0
-                        print(f"[Manager.py] Initial mask generated for frame {start_frame}")
+                        # Store this in the SAM2 frame index for now
+                        masks_list[0] = initial_masks[0][0].cpu().numpy() > 0.0
+                        print(f"[Manager.py] Initial mask generated for frame 0")
                     else:
-                        print(f"[Manager.py] Warning: No initial mask generated for frame {start_frame}")
+                        print(f"[Manager.py] Warning: No initial mask generated for frame 0")
                 except Exception as e:
                     print(f"[Manager.py] Error in add_new_points_or_box: {e}")
                     import traceback
                     traceback.print_exc()
                     raise
                     
-            print("[Manager.py] Processing video frames...")
-            
-            ## --- Forward Propagation ---
-            try:
-                print(f"[Manager.py] Calling forward propagation with start_frame_idx: {start_frame} " 
-                      f"and tracking for {total_frames - start_frame} frames")
+                print("[Manager.py] Processing video frames...")
                 
-                # For forward propagation:
-                forward_masks = list(predictor.propagate_in_video(
-                    inference_state=state,
-                    start_frame_idx=start_frame,
-                    max_frame_num_to_track=(total_frames - start_frame),
-                    reverse=False,
-                ))
-                
-                # For backward propagation (if start_frame > 0):
-                backward_masks = []
-                if start_frame > 0:
-                    print(f"[Manager.py] Calling backward propagation with start_frame_idx: {start_frame}")
-                    backward_masks = list(predictor.propagate_in_video(
+                # Simplified propagation - now just a single call since reordering is handled externally
+                try:
+                    print(f"[Manager.py] Calling propagation with standard parameters for {total_frames} frames")
+                    
+                    # Call SAM2's propagation with standard parameters
+                    raw_masks = list(predictor.propagate_in_video(
                         inference_state=state,
                         start_frame_idx=0,
-                        max_frame_num_to_track=start_frame,
-                        reverse=True,
+                        max_frame_num_to_track=total_frames,
+                        reverse=False
                     ))
-                
-                # Remap the results to original frame indices (if necessary)
-                forward_masks_remapped = [(start_frame + i, mask) for i, mask in enumerate(forward_masks)]
-                backward_masks_remapped = [(start_frame - 1 - i, mask) for i, mask in enumerate(backward_masks)]
-                
-                # Combine and sort the masks by frame index
-                raw_masks = forward_masks_remapped + backward_masks_remapped
-                raw_masks.sort(key=lambda x: x[0])
-            except Exception as e:
-                print(f"[Manager.py] Error in propagate_in_video: {e}")
-            
-            if progress_callback:
-                try:
-                    progress_callback(min(len(masks_list), total_frames), total_frames)
-                except Exception as e:
-                    print(f"[Manager.py] Error in progress callback: {e}")
                     
-            self.log_memory_usage("After collecting all masks")
-            print(f"[Manager.py] Collected masks for {len(masks_list)} frames")
-            
-            # Generate final colored masks per frame in small batches
-            print("[Manager.py] Generating final masks...")
-            final_masks = []
-            all_frame_masks = {frame_idx: {0: mask} for frame_idx, mask in masks_list.items()}
-            mask_color = [(255, 0, 0), (0, 255, 0), (0, 0, 255), (255, 255, 0), (255, 0, 255), (0, 255, 255)]
-            
-            for batch_start in range(0, total_frames, batch_size):
-                batch_end = min(batch_start + batch_size, total_frames)
-                print(f"[Manager.py] Processing batch {batch_start}-{batch_end}...")
+                    print(f"[Manager.py] Collecting propagated masks...")
+                    for raw_mask_item in raw_masks:
+                        print(f"[Manager.py] Processing mask item: {raw_mask_item}")
+                        print(f"[Manager.py] Processing mask item type: {type(raw_mask_item)}")
+                        # Handle the case where raw_mask_item is a tuple (which appears to be the case)
+                        # Most likely the tuple is (frame_idx, mask_tensor)
+                        if isinstance(raw_mask_item, tuple):
+                            if len(raw_mask_item) >= 2:  # Ensure we have at least two elements
+                                frame_idx = raw_mask_item[0]  # First element is the frame index
+                                mask = raw_mask_item[1]       # Second element is the mask tensor
+                                print(f"[Manager.py] Unpacked mask tuple for frame {frame_idx}")
+                                # Now store the mask after moving it to CPU
+                                if hasattr(mask, 'cpu'):
+                                    masks_list[frame_idx] = mask.cpu().numpy() > 0.0
+                                else:
+                                    print(f"[Manager.py] Warning: Mask for frame {frame_idx} is not a tensor: {type(mask)}")
+                            else:
+                                print(f"[Manager.py] Warning: Mask tuple has unexpected length: {len(raw_mask_item)}")
+                        else:
+                            # Handle the case where it's not a tuple (the original expected format)
+                            print(f"[Manager.py] Processing non-tuple mask of type: {type(raw_mask_item)}")
+                            # If it's not a tuple, we don't know the frame idx, so skip
+                            continue
+                    
+                    # Update progress after processing all masks
+                    if progress_callback:
+                        try:
+                            progress_callback(min(total_frames, 1), total_frames)
+                        except Exception as e:
+                            print(f"[Manager.py] Error in progress callback: {e}")
+                        
+                except Exception as e:
+                    print(f"[Manager.py] Error in propagate_in_video: {e}")
+                    import traceback
+                    traceback.print_exc()
                 
-                batch_masks = []
-                for frame_idx in range(batch_start, batch_end):
-                    img = np.zeros((height, width, 3), np.uint8)
-                    frame_masks = all_frame_masks.get(frame_idx, {})
-                    for obj_id, mask in frame_masks.items():
-                        img[mask] = mask_color[(obj_id + 1) % len(mask_color)]
-                        del mask
-                    batch_masks.append(img)
-                    if frame_idx in all_frame_masks:
-                        del all_frame_masks[frame_idx]
+                self.log_memory_usage("After collecting all masks")
+                print(f"[Manager.py] Collected masks for {len(masks_list)} frames")
                 
-                final_masks.extend(batch_masks)
-                del batch_masks
+                # Generate final colored masks per frame in small batches
+                print("[Manager.py] Generating final masks...")
+                final_masks = []
+                
+                # Convert frame-indexed dict to a list in the ORIGINAL video order
+                ordered_masks = []
+                for sam2_idx in range(total_frames):
+                    if sam2_idx in masks_list:
+                        # Get the mask for this SAM2 frame
+                        mask = masks_list[sam2_idx]
+                        
+                        # If we have a mapping, convert back to original frame index
+                        if sam2_to_original:
+                            original_idx = sam2_to_original.get(sam2_idx, sam2_idx)
+                        else:
+                            original_idx = sam2_idx
+                        
+                        # Add to ordered list, ensuring the original order is maintained
+                        while len(ordered_masks) <= original_idx:
+                            ordered_masks.append(None)
+                        ordered_masks[original_idx] = mask
+                
+                # Fill any gaps in ordered_masks
+                for i in range(len(ordered_masks)):
+                    if ordered_masks[i] is None:
+                        print(f"[Manager.py] Warning: Missing mask for original frame {i}")
+                        ordered_masks[i] = np.zeros((height, width), dtype=bool)
+                
+                # Generate colored masks in the original order
+                mask_color = [(255, 0, 0), (0, 255, 0), (0, 0, 255), (255, 255, 0), (255, 0, 255), (0, 255, 255)]
+                
+                for batch_start in range(0, total_frames, batch_size):
+                    batch_end = min(batch_start + batch_size, total_frames)
+                    print(f"[Manager.py] Processing batch {batch_start}-{batch_end}...")
+                    
+                    batch_masks = []
+                    for frame_idx in range(batch_start, batch_end):
+                        if frame_idx < len(ordered_masks) and ordered_masks[frame_idx] is not None:
+                            img = np.zeros((height, width, 3), np.uint8)
+                            mask = ordered_masks[frame_idx]
+                            img[mask] = mask_color[0]  # Using first color for now
+                            batch_masks.append(img)
+                        else:
+                            # Create an empty mask if missing
+                            img = np.zeros((height, width, 3), np.uint8)
+                            batch_masks.append(img)
+                    
+                    final_masks.extend(batch_masks)
+                    del batch_masks
+                    gc.collect()
+                    self.log_memory_usage(f"After batch {batch_start}-{batch_end}")
+                
+                # Clear memory
+                del ordered_masks, masks_list
                 gc.collect()
-                self.log_memory_usage(f"After batch {batch_start}-{batch_end}")
-            
-            del all_frame_masks
-            gc.collect()
-            
-            print(f"[Manager.py] Generated {len(final_masks)} frame masks")
-            self.log_memory_usage("After generating final masks")
-            
-            job_id = str(uuid.uuid4())
-            chunk_paths = self._process_and_save_masks(final_masks, job_id)
-            
-            if len(chunk_paths) == 1:
-                result = np.load(chunk_paths[0])
-                os.remove(chunk_paths[0])
-                print(f"[Manager.py] Returning single numpy array of shape {result.shape}")
-                return result
-            else:
-                print(f"[Manager.py] Returning {len(chunk_paths)} chunk paths")
-                return chunk_paths
-            
+                
+                print(f"[Manager.py] Generated {len(final_masks)} frame masks")
+                self.log_memory_usage("After generating final masks")
+                
+                # Save masks as needed
+                job_id = str(uuid.uuid4())
+                chunk_paths = self._process_and_save_masks(final_masks, job_id)
+                
+                if len(chunk_paths) == 1:
+                    result = np.load(chunk_paths[0])
+                    os.remove(chunk_paths[0])
+                    print(f"[Manager.py] Returning single numpy array of shape {result.shape}")
+                    return result
+                else:
+                    print(f"[Manager.py] Returning {len(chunk_paths)} chunk paths")
+                    return chunk_paths
+                
         except Exception as e:
             print(f"[Manager.py] Error in _generate_masks: {type(e).__name__}: {str(e)}")
             import traceback

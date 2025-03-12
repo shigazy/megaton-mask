@@ -7,7 +7,7 @@ from typing import Dict, List, Tuple, Optional
 
 # Configure S3 client
 s3_client = boto3.client('s3')
-BUCKET_NAME = os.environ.get('AWS_S3_BUCKET', 'megaton-roto-dev')
+BUCKET_NAME = os.environ.get('AWS_S3_BUCKET', 'megaton-roto-videos')
 
 def download_jpg_sequence(jpg_dir_key: str, temp_dir: Optional[str] = None) -> str:
     """
@@ -140,13 +140,13 @@ def prepare_sam2_jpg_sequence(
             frame_num = int(match.group(1))
             frame_to_filename[frame_num] = filename
     
-    # Create the reordered sequence
+    # Create the reordered sequence with numeric filenames (1.jpg, 2.jpg, etc.)
     for sam2_idx in range(len(sam2_to_original)):
         orig_idx = sam2_to_original[sam2_idx]
         if orig_idx in frame_to_filename:
             src_file = os.path.join(src_dir, frame_to_filename[orig_idx])
-            # Create a new filename with sequential numbering for SAM2
-            dest_file = os.path.join(dest_dir, f"frame_{sam2_idx:08d}.jpg")
+            # Create a simple numeric filename for SAM2
+            dest_file = os.path.join(dest_dir, f"{sam2_idx + 1}.jpg")  # +1 to avoid 0.jpg
             shutil.copy(src_file, dest_file)
     
     print(f"[JPG Sequence] Created reordered sequence with {len(sam2_to_original)} frames in {dest_dir}")

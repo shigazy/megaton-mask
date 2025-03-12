@@ -79,6 +79,7 @@ async def process_video_masks(
         db = SessionLocal()
         video = db.query(Video).filter(Video.id == video_id).first()
         task = db.query(Task).filter(Task.id == task_id).first()
+        
         # Get fps from video metadata
         fps = video.video_metadata.get('fps', 24) if video.video_metadata else 24
         logger.info(f"Using fps: {fps} from video metadata")
@@ -88,29 +89,27 @@ async def process_video_masks(
         if not task:
             raise ValueError(f"Task {task_id} not found")
 
-        # If super mode and no forward-reverse video exists, create it first
-        if super:
-            logger.info("Super mode detected - checking for forward-reverse video")
-            if not video.forward_reverse_key:
-                logger.info("No forward-reverse video found - creating one")
-                task.status = "creating_forward_reverse"
-                db.commit()
-                
-                # Create and upload forward-reverse video
-                await process_video_forward_reverse(video_id, db)
-                logger.info("Forward-reverse video created")
-
-            # Use forward-reverse video for processing
-            process_video_path = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4')
-            temp_files.append(process_video_path.name)
-            s3_client.download_file(BUCKET_NAME, video.forward_reverse_key, process_video_path.name)
+        # Check if we have a JPG sequence
+        if video.jpg_dir_key:
+            logger.info(f"Using JPG sequence from {video.jpg_dir_key}")
+            process_video_path = None  # We don't need a local video path
+            jpg_dir_key = video.jpg_dir_key
         else:
-            # Use original video
+            # We need to download the video file
+            logger.info("No JPG sequence available, using video file")
             process_video_path = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4')
             temp_files.append(process_video_path.name)
-            s3_client.download_file(BUCKET_NAME, video.s3_key, process_video_path.name)
+            
+            if super and video.forward_reverse_key:
+                logger.info("Using forward-reverse video")
+                s3_client.download_file(BUCKET_NAME, video.forward_reverse_key, process_video_path.name)
+            else:
+                logger.info("Using original video")
+                s3_client.download_file(BUCKET_NAME, video.s3_key, process_video_path.name)
+                
+            jpg_dir_key = None
 
-        # Update task status back to processing
+        # Update task status
         task.status = "processing"
         db.commit()
 
@@ -119,15 +118,44 @@ async def process_video_masks(
         temp_files.append(temp_mask.name)
 
         # Generate masks using inference manager
-        masks = await inference_manager.generate_full_video_masks(
-            video_path=process_video_path.name,
+        masks_or_chunk_paths = await inference_manager.generate_full_video_masks(
+            video_path=process_video_path.name if process_video_path else None,
             points=points,
             bbox=bbox,
             super_mode=super,
             method=method,
             start_frame=start_frame,
-            progress_callback=lambda current, total: update_task_progress(db, task_id, current, total)
+            progress_callback=lambda current, total: update_task_progress(db, task_id, current, total),
+            jpg_dir_key=jpg_dir_key
         )
+        
+        # Check if we got chunk paths or actual mask array
+        if isinstance(masks_or_chunk_paths, list) and all(isinstance(p, str) for p in masks_or_chunk_paths):
+            # We got chunk paths, which means masks were too large and saved to disk
+            logger.info(f"Received {len(masks_or_chunk_paths)} mask chunks")
+            
+            # Create temporary file for combined masks
+            temp_combined = tempfile.NamedTemporaryFile(delete=False, suffix='.npy')
+            temp_files.append(temp_combined.name)
+            
+            # Load and combine chunks
+            mask_chunks = []
+            for chunk_path in masks_or_chunk_paths:
+                chunk = np.load(chunk_path)
+                mask_chunks.append(chunk)
+                os.remove(chunk_path)  # Clean up the chunk file
+            
+            # Combine chunks
+            masks = np.concatenate(mask_chunks, axis=0)
+            np.save(temp_combined.name, masks)
+            
+            # Load the saved combined masks
+            masks = np.load(temp_combined.name)
+            logger.info(f"Combined masks shape: {masks.shape}")
+        else:
+            # We got the masks directly
+            masks = masks_or_chunk_paths
+            logger.info(f"Received masks directly, shape: {getattr(masks, 'shape', 'unknown')}")
 
         # Memory optimization: Process masks in chunks to avoid OOM
         logger.info(f"Saving masks to video file, shape: {masks.shape}")
@@ -202,7 +230,22 @@ async def process_video_masks(
         db.commit()
 
         # Split the greenscreen creation into a separate task to reduce memory pressure
-        await create_greenscreen_async(video_id, process_video_path.name, upload_path, task_id)
+        # First, make sure we have a valid video path for the greenscreen process
+        if process_video_path is None:
+            # If we used JPG sequence and don't have a local video file
+            # We need to download the original video for greenscreen processing
+            logger.info("Downloading original video for greenscreen processing")
+            temp_video = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4')
+            temp_files.append(temp_video.name)
+            
+            # Download the original video (not forward-reverse)
+            s3_client.download_file(BUCKET_NAME, video.s3_key, temp_video.name)
+            original_video_path = temp_video.name
+        else:
+            original_video_path = process_video_path.name
+
+        # Now call greenscreen with the valid path
+        await create_greenscreen_async(video_id, original_video_path, upload_path, task_id)
 
     except Exception as e:
         logger.error(f"Error occurred: {str(e)}")
