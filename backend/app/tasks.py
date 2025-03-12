@@ -20,6 +20,7 @@ import gc
 import torch
 import numpy as np
 import shutil
+import uuid
 
 logger = logging.getLogger(__name__)
 
@@ -129,6 +130,13 @@ async def process_video_masks(
             jpg_dir_key=jpg_dir_key
         )
         
+        # Debug the received masks
+        print(f"[Tasks.py] Received masks of type {type(masks_or_chunk_paths)}")
+        if isinstance(masks_or_chunk_paths, np.ndarray):
+            print(f"[Tasks.py] Mask array shape: {masks_or_chunk_paths.shape}")
+        elif isinstance(masks_or_chunk_paths, list):
+            print(f"[Tasks.py] Received {len(masks_or_chunk_paths)} chunk paths")
+
         # Check if we got chunk paths or actual mask array
         if isinstance(masks_or_chunk_paths, list) and all(isinstance(p, str) for p in masks_or_chunk_paths):
             # We got chunk paths, which means masks were too large and saved to disk
@@ -152,6 +160,17 @@ async def process_video_masks(
             # Load the saved combined masks
             masks = np.load(temp_combined.name)
             logger.info(f"Combined masks shape: {masks.shape}")
+
+            # After loading/combining masks:
+            debug_dir = f"/home/ec2-user/megaton-roto-dev/backend/tmp/sam2_debug/tasks_masks_{str(uuid.uuid4())[:8]}"
+            os.makedirs(debug_dir, exist_ok=True)
+            print(f"[Tasks.py] Saving ALL masks before video encoding to {debug_dir}")
+            # Save ALL masks before encoding
+            for i in range(len(masks)):
+                sample_mask = masks[i]
+                debug_path = f"{debug_dir}/before_encoding_{i:08d}.jpg"
+                cv2.imwrite(debug_path, sample_mask)
+            print(f"[Tasks.py] Saved all {len(masks)} masks before encoding")
         else:
             # We got the masks directly
             masks = masks_or_chunk_paths
@@ -163,41 +182,45 @@ async def process_video_masks(
         fourcc = cv2.VideoWriter_fourcc(*'mp4v')
         out = cv2.VideoWriter(temp_mask.name, fourcc, fps, (width, height))
         
-        # Write masks in smaller batches to reduce memory usage
-        chunk_size = 100  # Process 100 frames at a time
-        for i in range(0, len(masks), chunk_size):
-            chunk_end = min(i + chunk_size, len(masks))
-            for j in range(i, chunk_end):
-                out.write(masks[j])
-            
-            # Clear processed chunk from memory
-            if i + chunk_size < len(masks):
-                # Create a new array without the processed frames
-                masks = np.concatenate([np.zeros((chunk_end-i, height, width, 3), dtype=masks.dtype), 
-                                       masks[chunk_end:]])
-                gc.collect()
-                logger.info(f"Processed mask frames {i}-{chunk_end-1}")
-        
-        out.release()
-        
-        # Clear masks from memory completely
-        del masks
-        gc.collect()
-        torch.cuda.empty_cache()
-        logger.info("Masks saved to video file, cleared from memory")
+        # Write ALL masks directly - no chunking
+        masks_written = 0
+        for i, mask in enumerate(masks):
+            if mask is not None and mask.size > 0:
+                out.write(mask)
+                masks_written += 1
+                # Log progress
+                if i % 50 == 0 or i == len(masks) - 1:
+                    print(f"[Tasks.py] Written {i+1}/{len(masks)} masks to video")
 
-        # Process the mask video if it's a super video
-        if super:
-            temp_processed = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4')
-            temp_files.append(temp_processed.name)
-            process_super_video(temp_mask.name, temp_processed.name)
-            upload_path = temp_processed.name
-        else:
-            # Convert to H.264 for normal videos
-            temp_h264 = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4')
-            temp_files.append(temp_h264.name)
-            convert_to_h264(temp_mask.name, temp_h264.name)
-            upload_path = temp_h264.name
+        # Release the writer
+        out.release()
+        print(f"[Tasks.py] Completed writing {masks_written}/{len(masks)} masks to video")
+
+        # Verify the output video
+        mask_cap = cv2.VideoCapture(temp_mask.name)
+        mask_frames = int(mask_cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        mask_cap.release()
+        print(f"[Tasks.py] Mask video contains {mask_frames} frames according to OpenCV")
+
+        # Ensure we wrote all frames
+        if mask_frames != len(masks):
+            print(f"[Tasks.py] WARNING: Mask video frame count ({mask_frames}) doesn't match expected ({len(masks)})")
+            print(f"[Tasks.py] This will cause issues in the greenscreen process")
+
+        # Save the mask video to debug for inspection
+        debug_dir = "/home/ec2-user/megaton-roto-dev/backend/tmp/sam2_debug"
+        os.makedirs(debug_dir, exist_ok=True)
+        mask_debug_path = f"{debug_dir}/final_mask_video_{str(uuid.uuid4())[:8]}.mp4"
+        shutil.copy(temp_mask.name, mask_debug_path)
+        print(f"[Tasks.py] Saved copy of mask video to {mask_debug_path}")
+
+
+        
+        # Convert to H.264 for normal videos
+        temp_h264 = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4')
+        temp_files.append(temp_h264.name)
+        convert_to_h264(temp_mask.name, temp_h264.name)
+        upload_path = temp_h264.name
 
         # Upload results to S3
         logger.info("Starting S3 upload...")
@@ -247,6 +270,12 @@ async def process_video_masks(
         # Now call greenscreen with the valid path
         await create_greenscreen_async(video_id, original_video_path, upload_path, task_id)
 
+        # NOW we can safely clear masks from memory
+        del masks
+        gc.collect()
+        torch.cuda.empty_cache()
+        logger.info("Masks saved to video file, cleared from memory")
+        
     except Exception as e:
         logger.error(f"Error occurred: {str(e)}")
         if task and db:
@@ -325,6 +354,107 @@ async def create_greenscreen_async(video_id, original_video_path, mask_video_pat
         
         logger.info(f"Greenscreen video created and uploaded: {greenscreen_key}")
         
+        # Right after creating greenscreen (around line 358):
+        # Save greenscreen video to debug folder
+        debug_dir = "/home/ec2-user/megaton-roto-dev/backend/tmp/sam2_debug"
+        os.makedirs(debug_dir, exist_ok=True)
+        debug_gs_path = f"{debug_dir}/greenscreen_raw_{str(uuid.uuid4())[:8]}.mp4"
+        debug_gs_h264_path = f"{debug_dir}/greenscreen_h264_{str(uuid.uuid4())[:8]}.mp4"
+
+        # Copy both raw and h264 versions for debug
+        if os.path.exists(temp_greenscreen.name):
+            shutil.copy(temp_greenscreen.name, debug_gs_path)
+            print(f"[Tasks.py] Saved raw greenscreen to {debug_gs_path}")
+            
+            # Analyze the greenscreen video
+            try:
+                gs_cap = cv2.VideoCapture(debug_gs_path)
+                gs_frame_count = int(gs_cap.get(cv2.CAP_PROP_FRAME_COUNT))
+                gs_fps = gs_cap.get(cv2.CAP_PROP_FPS)
+                print(f"[Tasks.py] GREENSCREEN RAW: frames={gs_frame_count}, fps={gs_fps}")
+                
+                # Check specific frames from the greenscreen
+                frames_to_check = [0, 50, 100, 150, gs_frame_count-1]
+                frames_to_check = [f for f in frames_to_check if f < gs_frame_count]
+                
+                for idx in frames_to_check:
+                    gs_cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
+                    ret, frame = gs_cap.read()
+                    if ret:
+                        frame_path = f"{debug_dir}/gs_frame_{idx:08d}.jpg"
+                        cv2.imwrite(frame_path, frame)
+                        print(f"[Tasks.py] Saved greenscreen frame {idx}")
+            
+                gs_cap.release()
+            except Exception as e:
+                print(f"[Tasks.py] Error analyzing greenscreen: {str(e)}")
+
+        # Also save and analyze the h264 version
+        if os.path.exists(temp_greenscreen_h264.name):
+            shutil.copy(temp_greenscreen_h264.name, debug_gs_h264_path)
+            print(f"[Tasks.py] Saved h264 greenscreen to {debug_gs_h264_path}")
+            
+            try:
+                gs_h264_cap = cv2.VideoCapture(debug_gs_h264_path)
+                gs_h264_frame_count = int(gs_h264_cap.get(cv2.CAP_PROP_FRAME_COUNT))
+                gs_h264_fps = gs_h264_cap.get(cv2.CAP_PROP_FPS)
+                print(f"[Tasks.py] GREENSCREEN H264: frames={gs_h264_frame_count}, fps={gs_h264_fps}")
+                gs_h264_cap.release()
+            except Exception as e:
+                print(f"[Tasks.py] Error analyzing h264 greenscreen: {str(e)}")
+
+        # Add debug for mask_video_path
+        try:
+            mask_cap = cv2.VideoCapture(mask_video_path)
+            mask_frame_count = int(mask_cap.get(cv2.CAP_PROP_FRAME_COUNT))
+            mask_fps = mask_cap.get(cv2.CAP_PROP_FPS)
+            print(f"[Tasks.py] MASK INPUT FOR GREENSCREEN: frames={mask_frame_count}, fps={mask_fps}")
+            mask_cap.release()
+        except Exception as e:
+            print(f"[Tasks.py] Error analyzing mask video input: {str(e)}")
+
+        # Add debug for original_video_path
+        try:
+            orig_cap = cv2.VideoCapture(original_video_path)
+            orig_frame_count = int(orig_cap.get(cv2.CAP_PROP_FRAME_COUNT))
+            orig_fps = orig_cap.get(cv2.CAP_PROP_FPS)
+            print(f"[Tasks.py] ORIGINAL VIDEO FOR GREENSCREEN: frames={orig_frame_count}, fps={orig_fps}")
+            orig_cap.release()
+        except Exception as e:
+            print(f"[Tasks.py] Error analyzing original video input: {str(e)}")
+
+        # Add S3 upload logging and verification
+        print(f"[Tasks.py] About to upload greenscreen to S3: {greenscreen_key}")
+
+        # After uploading to S3, verify the upload:
+        try:
+            print(f"[Tasks.py] Verifying S3 upload: {greenscreen_key}")
+            response = s3_client.head_object(Bucket=BUCKET_NAME, Key=greenscreen_key)
+            uploaded_size = response.get('ContentLength', 0)
+            original_size = os.path.getsize(temp_greenscreen_h264.name)
+            
+            print(f"[Tasks.py] S3 upload verification:")
+            print(f"[Tasks.py] - Local file size: {original_size} bytes")
+            print(f"[Tasks.py] - S3 object size: {uploaded_size} bytes")
+            
+            if uploaded_size == original_size:
+                print(f"[Tasks.py] S3 upload verified successfully - sizes match")
+            else:
+                print(f"[Tasks.py] WARNING: S3 upload size mismatch!")
+        except Exception as e:
+            print(f"[Tasks.py] Error verifying S3 upload: {str(e)}")
+
+        # Generate a pre-signed URL to check the uploaded content
+        try:
+            gs_url = s3_client.generate_presigned_url(
+                'get_object',
+                Params={'Bucket': BUCKET_NAME, 'Key': greenscreen_key},
+                ExpiresIn=3600
+            )
+            print(f"[Tasks.py] Greenscreen URL for testing: {gs_url[:100]}...")
+        except Exception as e:
+            print(f"[Tasks.py] Error generating presigned URL: {str(e)}")
+
     except Exception as e:
         logger.error(f"Error in greenscreen creation: {str(e)}")
         if task and db:

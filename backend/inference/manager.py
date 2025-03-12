@@ -503,8 +503,18 @@ class InferenceManager:
                         print(f"[Manager.py] Warning: Missing mask for original frame {i}")
                         ordered_masks[i] = np.zeros((height, width), dtype=bool)
                 
+                # Save ordered masks for debugging
+                debug_dir = f"/home/ec2-user/megaton-roto-dev/backend/tmp/sam2_debug/ordered_masks_{str(uuid.uuid4())[:8]}"
+                os.makedirs(debug_dir, exist_ok=True)
+                print(f"[Manager.py] Saving ordered masks for debugging to {debug_dir}")
+                for i, mask in enumerate(ordered_masks):
+                    if mask is not None:
+                        debug_path = f"{debug_dir}/ordered_mask_{i:08d}.npy"
+                        np.save(debug_path, mask.astype(np.uint8))
+                print(f"[Manager.py] Saved {len(ordered_masks)} ordered masks to {debug_dir}")
+                
                 # Generate colored masks in the original order
-                mask_color = [(255, 0, 0), (0, 255, 0), (0, 0, 255), (255, 255, 0), (255, 0, 255), (0, 255, 255)]
+                mask_color = [(255, 255, 255)]  # White color for masks
                 
                 for batch_start in range(0, total_frames, batch_size):
                     batch_end = min(batch_start + batch_size, total_frames)
@@ -534,6 +544,15 @@ class InferenceManager:
                 print(f"[Manager.py] Generated {len(final_masks)} frame masks")
                 self.log_memory_usage("After generating final masks")
                 
+                # Save ALL final colored masks for debugging (not just every 10th)
+                debug_dir = f"/home/ec2-user/megaton-roto-dev/backend/tmp/sam2_debug/final_masks_{str(uuid.uuid4())[:8]}"
+                os.makedirs(debug_dir, exist_ok=True)
+                print(f"[Manager.py] Saving ALL final colored masks for debugging to {debug_dir}")
+                for i, mask in enumerate(final_masks):
+                    debug_path = f"{debug_dir}/final_mask_{i:08d}.jpg"
+                    cv2.imwrite(debug_path, mask)
+                print(f"[Manager.py] Saved {len(final_masks)} final masks to {debug_dir}")
+                
                 # Save masks as needed
                 job_id = str(uuid.uuid4())
                 chunk_paths = self._process_and_save_masks(final_masks, job_id)
@@ -546,6 +565,17 @@ class InferenceManager:
                 else:
                     print(f"[Manager.py] Returning {len(chunk_paths)} chunk paths")
                     return chunk_paths
+                
+            # After the for loop that processes raw_mask_items, add:
+            # Save raw masks for debugging
+            debug_dir = f"/home/ec2-user/megaton-roto-dev/backend/tmp/sam2_debug/raw_masks_{str(uuid.uuid4())[:8]}"
+            os.makedirs(debug_dir, exist_ok=True)
+            print(f"[Manager.py] Saving raw masks for debugging to {debug_dir}")
+            for frame_idx, mask in masks_list.items():
+                if mask is not None:
+                    debug_path = f"{debug_dir}/raw_mask_{frame_idx:08d}.npy"
+                    np.save(debug_path, mask.astype(np.uint8))
+            print(f"[Manager.py] Saved {len(masks_list)} raw masks to {debug_dir}")
                 
         except Exception as e:
             print(f"[Manager.py] Error in _generate_masks: {type(e).__name__}: {str(e)}")

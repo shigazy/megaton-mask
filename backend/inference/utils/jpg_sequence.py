@@ -3,6 +3,8 @@ import boto3
 import tempfile
 import shutil
 import re
+import json
+import uuid
 from typing import Dict, List, Tuple, Optional
 
 # Configure S3 client
@@ -34,6 +36,13 @@ def download_jpg_sequence(jpg_dir_key: str, temp_dir: Optional[str] = None) -> s
     if 'Contents' not in response:
         raise ValueError(f"No JPG sequence found at {jpg_dir_key}")
     
+    # Get file count from S3
+    jpg_count = len([obj for obj in response['Contents'] if not obj['Key'].endswith('/')])
+    print(f"[JPG Sequence] Found {jpg_count} JPG files in S3 at {jpg_dir_key}")
+    
+    # Track downloaded files
+    downloaded_files = 0
+    
     # Download each JPG file
     for obj in response['Contents']:
         # Skip the directory object itself
@@ -50,8 +59,26 @@ def download_jpg_sequence(jpg_dir_key: str, temp_dir: Optional[str] = None) -> s
             Key=obj['Key'],
             Filename=local_path
         )
+        downloaded_files += 1
     
-    print(f"[JPG Sequence] Downloaded {len(response['Contents'])} frames")
+    # Verify we downloaded everything
+    actual_files = len([f for f in os.listdir(temp_dir) if f.endswith('.jpg')])
+    print(f"[JPG Sequence] Downloaded {downloaded_files} frames, found {actual_files} in local directory")
+    
+    # Save file list for debugging
+    debug_dir = "/home/ec2-user/megaton-roto-dev/backend/tmp/sam2_debug"
+    os.makedirs(debug_dir, exist_ok=True)
+    debug_path = f"{debug_dir}/downloaded_files_{str(uuid.uuid4())[:8]}.txt"
+    
+    with open(debug_path, 'w') as f:
+        f.write(f"S3 Path: {jpg_dir_key}\n")
+        f.write(f"Expected files: {jpg_count}\n")
+        f.write(f"Downloaded files: {downloaded_files}\n")
+        f.write("Files in directory:\n")
+        for file in sorted(os.listdir(temp_dir)):
+            if file.endswith('.jpg'):
+                f.write(f"  {file}\n")
+    
     return temp_dir 
 
 def create_sam2_frame_mapping(
@@ -96,6 +123,20 @@ def create_sam2_frame_mapping(
             original_to_sam2[orig_idx] = sam2_idx
             sam2_to_original[sam2_idx] = orig_idx
             sam2_idx += 1
+    
+    # Save mapping info for debugging
+    debug_dir = "/home/ec2-user/megaton-roto-dev/backend/tmp/sam2_debug"
+    os.makedirs(debug_dir, exist_ok=True)
+    debug_id = str(uuid.uuid4())[:8]
+    debug_path = f"{debug_dir}/mapping_{debug_id}.json"
+    with open(debug_path, 'w') as f:
+        json.dump({
+            "original_to_sam2": {str(k): v for k, v in original_to_sam2.items()},
+            "sam2_to_original": {str(k): v for k, v in sam2_to_original.items()},
+            "total_frames": total_frames,
+            "start_frame": start_frame
+        }, f, indent=2)
+    print(f"[JPG Sequence] Saved mapping debug info to {debug_path}")
     
     return original_to_sam2, sam2_to_original
 
@@ -148,6 +189,16 @@ def prepare_sam2_jpg_sequence(
             # Create a simple numeric filename for SAM2
             dest_file = os.path.join(dest_dir, f"{sam2_idx + 1}.jpg")  # +1 to avoid 0.jpg
             shutil.copy(src_file, dest_file)
+    
+    # Save some sample frames for debugging
+    debug_dir = f"/home/ec2-user/megaton-roto-dev/backend/tmp/sam2_debug/frames_{str(uuid.uuid4())[:8]}"
+    os.makedirs(debug_dir, exist_ok=True)
+    # Save all frames for inspection
+    for sam2_idx in range(len(sam2_to_original)):
+        src_file = os.path.join(dest_dir, f"{sam2_idx + 1}.jpg")  # Using the numeric format
+        if os.path.exists(src_file):
+            shutil.copy(src_file, f"{debug_dir}/sam2_frame_{sam2_idx:08d}.jpg")
+    print(f"[JPG Sequence] Saved all frames to {debug_dir}")
     
     print(f"[JPG Sequence] Created reordered sequence with {len(sam2_to_original)} frames in {dest_dir}")
     return dest_dir, sam2_to_original 

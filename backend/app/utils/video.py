@@ -258,6 +258,25 @@ def create_greenscreen_video(original_video_path: str, mask_video_path: str, out
         mask_video_path: Path to the mask video (white object on black background)
         output_path: Path where the green screen video will be saved
     """
+    # Add minimal logging
+    print(f"[VideoUtils] Creating greenscreen video")
+    print(f"[VideoUtils] - Original: {original_video_path}")
+    print(f"[VideoUtils] - Mask: {mask_video_path}")
+    print(f"[VideoUtils] - Output: {output_path}")
+    
+    # Check input videos
+    orig_cap = cv2.VideoCapture(original_video_path)
+    mask_cap = cv2.VideoCapture(mask_video_path)
+    
+    orig_frames = int(orig_cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    mask_frames = int(mask_cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    
+    print(f"[VideoUtils] Original video: {orig_frames} frames")
+    print(f"[VideoUtils] Mask video: {mask_frames} frames")
+    
+    if orig_frames != mask_frames:
+        print(f"[VideoUtils] WARNING: Frame count mismatch! orig={orig_frames}, mask={mask_frames}")
+    
     # Open both videos
     original = cv2.VideoCapture(original_video_path)
     mask = cv2.VideoCapture(mask_video_path)
@@ -271,11 +290,17 @@ def create_greenscreen_video(original_video_path: str, mask_video_path: str, out
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
     out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
     
+    frames_processed = 0  # Add counter
     while True:
         ret1, frame = original.read()
         ret2, mask_frame = mask.read()
         
         if not ret1 or not ret2:
+            # Log which one failed
+            if not ret1 and frames_processed < orig_frames:
+                print(f"[VideoUtils] Original stream ended early at frame {frames_processed}/{orig_frames}")
+            if not ret2 and frames_processed < mask_frames:
+                print(f"[VideoUtils] Mask stream ended early at frame {frames_processed}/{mask_frames}")
             break
             
         # Convert mask to grayscale if it's RGB
@@ -293,8 +318,22 @@ def create_greenscreen_video(original_video_path: str, mask_video_path: str, out
         composite = np.where(mask_3channel == [255, 255, 255], frame, green_bg)
         
         out.write(composite)
+        frames_processed += 1
+        
+        # Log progress periodically
+        if frames_processed % 50 == 0:
+            print(f"[VideoUtils] Processed {frames_processed} frames")
     
     # Release everything
     original.release()
     mask.release()
     out.release()
+    
+    # Verify output
+    if os.path.exists(output_path):
+        verify_cap = cv2.VideoCapture(output_path)
+        verify_frames = int(verify_cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        verify_cap.release()
+        print(f"[VideoUtils] Completed greenscreen with {verify_frames} frames")
+    else:
+        print(f"[VideoUtils] ERROR: Output file {output_path} was not created")
