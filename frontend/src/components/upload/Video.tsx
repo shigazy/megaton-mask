@@ -827,22 +827,44 @@ export const VideoUpload = ({ onUploadSuccess, fetchVideos, initialVideo,setInit
       };
       formData.append('annotations', JSON.stringify(annotationData));
 
-      const response = await axios.post(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/videos/upload`,
+      // Create custom axios instance with progress tracking
+      const uploadInstance = axios.create({
+        baseURL: process.env.NEXT_PUBLIC_API_URL,
+        headers: {
+          'Content-Type': 'multipart/form-data',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+
+      // Add upload progress event listener
+      const response = await uploadInstance.post(
+        '/api/videos/upload',
         formData,
         {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-          },
           onUploadProgress: (progressEvent) => {
-            const percentCompleted = Math.round(
-              (progressEvent.loaded * 100) / (progressEvent.total || 1)
-            );
-            setProgress(percentCompleted);
+            // Enhanced progress calculation
+            const total = progressEvent.total || file.size;
+            const loaded = progressEvent.loaded;
+            
+            // Calculate percentage - divide into phases:
+            // - 0-90%: Actual upload
+            // - 90-100%: Server processing
+            const uploadPercentage = Math.min(90, Math.round((loaded * 90) / total));
+            
+            setProgress(uploadPercentage);
+            
+            if (uploadPercentage === 90) {
+              setStatus(`Processing ${file.name}...`, 'processing');
+            } else {
+              setStatus(`Uploading ${file.name} (${uploadPercentage}%)...`, 'processing');
+            }
           },
         }
       );
+
+      // After upload completes, show processing
+      setStatus(`Finalizing ${file.name}...`, 'processing');
+      setProgress(95);
 
       console.log('Upload response:', response.data);
 
@@ -864,10 +886,24 @@ export const VideoUpload = ({ onUploadSuccess, fetchVideos, initialVideo,setInit
       setStatus(`Successfully uploaded ${file.name}`, 'success');
     } catch (error) {
       console.error('Upload failed:', error);
-      setStatus(
-        `Failed to upload ${file.name}: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        'error'
-      );
+      
+      // Handle authentication errors specifically
+      if (axios.isAxiosError(error) && error.response?.status === 401) {
+        setStatus(`Session expired. Please refresh the page and try again.`, 'error');
+        
+        // Force authentication refresh
+        try {
+          await refreshToken();
+          setStatus(`Authentication refreshed. Please try uploading again.`, 'warning');
+        } catch (refreshError) {
+          setStatus(`Authentication failed. Please log in again.`, 'error');
+        }
+      } else {
+        setStatus(
+          `Failed to upload ${file.name}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          'error'
+        );
+      }
     } finally {
       setIsProcessing(false);
       setUploading(false);
@@ -1052,7 +1088,6 @@ export const VideoUpload = ({ onUploadSuccess, fetchVideos, initialVideo,setInit
             console.log('Setting progress from message parsing:', progress, 'Current:', current, 'Total:', total);
             setMaskGenerationProgress(progress);
             setStatus(`Generating masks: ${progress}%`, 'processing');
-
           }
         }
 

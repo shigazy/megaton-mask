@@ -35,6 +35,10 @@ export const VideoGallery = ({
   const [currentPage, setCurrentPage] = useState(1);
   const [isHovered, setIsHovered] = useState(false);
   const itemsPerPage = viewMode === 'grid' ? 9 : 10;
+  
+  // Add state for delete confirmation
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [videoToDelete, setVideoToDelete] = useState<string | null>(null);
 
   // Calculate pagination
   const totalPages = Math.ceil(videos.length / itemsPerPage);
@@ -257,6 +261,43 @@ export const VideoGallery = ({
     }
   };
 
+  // Update the handleDelete function to show confirmation instead of directly deleting
+  const handleDelete = (videoId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setVideoToDelete(videoId);
+    setShowDeleteConfirm(true);
+  };
+
+  // Function to handle confirmed deletion
+  const confirmDelete = () => {
+    if (videoToDelete) {
+      onDeleteVideo(videoToDelete);
+      setStatus('Video deleted successfully', 'success');
+      
+      // If we're deleting the active video, clear it
+      if (videoToDelete === activeVideoId) {
+        onSelectVideo('');
+      }
+      
+      // Clear the selected videos set if it contains the deleted video
+      if (selectedVideos.has(videoToDelete)) {
+        const newSelectedVideos = new Set(selectedVideos);
+        newSelectedVideos.delete(videoToDelete);
+        setSelectedVideos(newSelectedVideos);
+      }
+      
+      // Reset states
+      setVideoToDelete(null);
+      setShowDeleteConfirm(false);
+    }
+  };
+
+  // Cancel deletion
+  const cancelDelete = () => {
+    setVideoToDelete(null);
+    setShowDeleteConfirm(false);
+  };
+
   const renderGridView = () => (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
       {/* Existing grid view code ... */}
@@ -306,7 +347,7 @@ export const VideoGallery = ({
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  onDeleteVideo(video.id);
+                  handleDelete(video.id, e);
                 }}
                 className="p-2 rounded-full bg-[var(--background)] hover:bg-[var(--accent-purple)] 
                            transition-colors shadow-lg tooltip-wrapper"
@@ -468,7 +509,7 @@ export const VideoGallery = ({
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                onDeleteVideo(video.id);
+                handleDelete(video.id, e);
               }}
               className="p-2 rounded-full hover:bg-[var(--background-hover)] transition-colors tooltip-wrapper"
             >
@@ -663,6 +704,32 @@ export const VideoGallery = ({
           </>
         )}
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-[var(--bg-color)] rounded-lg p-6 max-w-md w-full shadow-xl">
+            <h3 className="text-lg font-medium mb-4">Confirm Deletion</h3>
+            <p className="text-[var(--text-secondary)] mb-6">
+              Are you sure you want to delete this video? This action cannot be undone.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={cancelDelete}
+                className="px-4 py-2 border border-[var(--border-color)] rounded-lg text-sm font-medium hover:bg-[var(--hover-color)]"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDelete}
+                className="px-4 py-2 bg-red-500 text-white rounded-lg text-sm font-medium hover:bg-red-600"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
