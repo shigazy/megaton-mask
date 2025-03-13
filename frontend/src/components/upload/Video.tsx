@@ -45,6 +45,7 @@ interface AnnotationLayerProps {
   getCurrentFrame: () => number;
   onBboxDragStart: () => void;
   onBboxDragEnd: () => void;
+  setDrawMode: (mode: 'bbox' | 'points') => void;
 }
 
 interface UploadResponse {
@@ -106,6 +107,7 @@ const AnnotationLayer = ({
   videoWidth,
   videoHeight,
   drawMode,
+  setDrawMode,
   pointType,
   points,
   bbox,
@@ -161,6 +163,17 @@ const AnnotationLayer = ({
       startPoint.current = { x, y };
       setIsDrawing(true);
       onBboxDragStart && onBboxDragStart();
+      const pointIndex = pointsArray.findIndex(point => {
+        const dx = point.x - x;
+        const dy = point.y - y;
+        return Math.sqrt(dx * dx + dy * dy) < 5;
+      });
+      setHoveredPointIndex(pointIndex);
+      if (pointIndex !== -1) {
+        const newPoints = pointsArray.filter((_, i) => i !== pointIndex);
+        onPointsChange(newPoints);
+        setDrawMode('points');
+      }
     } else if (drawMode === 'points') {
       // console.log('Drawing points', console.log(points));
       const pointIndex = pointsArray.findIndex(point => {

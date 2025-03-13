@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 
 interface User {
@@ -26,28 +26,54 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Create a centralized API client
+const apiClient = axios.create({
+  baseURL: process.env.NEXT_PUBLIC_API_URL
+});
+
+// Add this function to decode and check token expiration
+const getTokenExpiration = (token: string) => {
+  try {
+    // JWT tokens are base64 encoded with 3 parts separated by dots
+    const base64Url = token.split('.')[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const payload = JSON.parse(window.atob(base64));
+    
+    // exp is in seconds, convert to milliseconds for JS Date
+    if (payload.exp) {
+      const expiryDate = new Date(payload.exp * 1000);
+      const now = new Date();
+      console.log('Token expires at:', expiryDate.toISOString());
+      console.log('Current time:', now.toISOString());
+      console.log('Time until expiry:', (expiryDate.getTime() - now.getTime()) / 1000, 'seconds');
+      return payload.exp;
+    }
+    return null;
+  } catch (error) {
+    console.error('Error decoding token:', error);
+    return null;
+  }
+};
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshingToken, setRefreshingToken] = useState(false);
+  const refreshPromise = useRef<Promise<string> | null>(null);
 
   const fetchUserProfile = async (token: string) => {
     try {
       setIsLoading(true);  // Set loading true while fetching
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/users/me`, {
+      const response = await apiClient.get('/api/users/me', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
       });
 
-      if (!response.ok) throw new Error('Failed to fetch user profile');
-
-      const userData = await response.json();
-      console.log('Fetched user profile:', userData);
-
       // Update stored user data with complete profile
-      localStorage.setItem('user', JSON.stringify(userData));
-      setUser(userData);
+      localStorage.setItem('user', JSON.stringify(response.data));
+      setUser(response.data);
+      console.log('Fetched user profile:', response.data);
     } catch (error) {
       console.error('Error fetching user profile:', error);
     } finally {
@@ -55,8 +81,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // Function to refresh token
+  // Function to refresh token with mutex pattern to prevent race conditions
   const refreshToken = async () => {
+    console.log('Attempting to refresh token...');
+    // If there's already a refresh in progress, return that promise
+    if (refreshPromise.current) {
+      return refreshPromise.current;
+    }
+
     try {
       setRefreshingToken(true);
       const storedRefreshToken = localStorage.getItem('refreshToken');
@@ -65,108 +97,72 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw new Error('No refresh token found');
       }
 
-      const response = await window.fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/refresh`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ refresh_token: storedRefreshToken }),
-      });
+      // Create a new promise for this refresh operation
+      refreshPromise.current = (async () => {
+        try {
+          const response = await apiClient.post('/api/auth/refresh', {
+            refresh_token: storedRefreshToken
+          });
 
-      if (!response.ok) {
-        throw new Error('Failed to refresh token');
-      }
+          const data = response.data;
 
-      const data = await response.json();
+          // Update tokens in storage
+          localStorage.setItem('token', data.access_token);
+          localStorage.setItem('refreshToken', data.refresh_token);
 
-      // Update tokens in storage
-      localStorage.setItem('token', data.access_token);
-      localStorage.setItem('refreshToken', data.refresh_token);
+          // Update axios default headers
+          apiClient.defaults.headers.common['Authorization'] = `Bearer ${data.access_token}`;
 
-      // Update axios header
-      axios.defaults.headers.common['Authorization'] = `Bearer ${data.access_token}`;
+          // After successful refresh
+          console.log('Token refreshed successfully');
+          const newToken = localStorage.getItem('token');
+          if (newToken) {
+            getTokenExpiration(newToken);
+          }
 
-      return data.access_token;
-    } catch (error) {
-      console.error('Error refreshing token:', error);
-      // Clear auth data on refresh failure
-      logout();
-      throw error;
+          return data.access_token;
+        } catch (error) {
+          console.error('Error refreshing token:', error);
+          // Clear auth data on refresh failure
+          logout();
+          throw error;
+        }
+      })();
+
+      return await refreshPromise.current;
     } finally {
       setRefreshingToken(false);
+      refreshPromise.current = null;
     }
   };
 
-  // Setup fetch interceptor
-  useEffect(() => {
-    // Store the original fetch function
-    const originalFetch = window.fetch;
-
-    // Override the global fetch function
-    window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
-      // Create a new init object to avoid modifying the original
-      const modifiedInit = init ? { ...init } : {};
-
-      // Add authorization header if a token exists
-      const token = localStorage.getItem('token');
-      if (token) {
-        modifiedInit.headers = {
-          ...modifiedInit.headers,
-          'Authorization': `Bearer ${token}`
-        };
-      }
-
-      // Make the initial fetch request
-      let response = await originalFetch(input, modifiedInit);
-
-      // If we get a 401 and we're not currently refreshing tokens and we have a refresh token
-      if (response.status === 401 && !refreshingToken && localStorage.getItem('refreshToken')) {
-        try {
-          // Try to refresh the token
-          const newToken = await refreshToken();
-
-          // Create new headers with the new token
-          const newInit = {
-            ...modifiedInit,
-            headers: {
-              ...modifiedInit.headers,
-              'Authorization': `Bearer ${newToken}`
-            }
-          };
-
-          // Retry the request with the new token
-          response = await originalFetch(input, newInit);
-        } catch (error) {
-          console.error('Error refreshing token for fetch:', error);
-          // Let the 401 response pass through if refresh failed
-        }
-      }
-
-      return response;
-    };
-
-    // Cleanup function to restore original fetch
-    return () => {
-      window.fetch = originalFetch;
-    };
-  }, [refreshingToken]);
-
+  // Initialize authentication state
   useEffect(() => {
     const initializeAuth = async () => {
       const token = localStorage.getItem('token');
-      const storedUser = localStorage.getItem('user');
-
+      
       if (token) {
-        // Set initial user data from localStorage
-        if (storedUser) {
-          setUser(JSON.parse(storedUser));
+        console.log('Initial token check:');
+        // Check if token is expired
+        const isExpired = checkIfTokenExpired(token);
+        
+        if (isExpired) {
+          console.log('Token is expired, refreshing immediately...');
+          // Try to refresh the token before proceeding
+          try {
+            await refreshToken();
+            // After refresh, proceed with fetching user profile
+            await fetchUserProfile(token);
+          } catch (error) {
+            console.error('Failed to refresh expired token:', error);
+            // Clear auth state since we couldn't refresh
+            setUser(null);
+            localStorage.removeItem('token');
+          }
+        } else {
+          // Token is still valid, proceed normally
+          await fetchUserProfile(token);
         }
-
-        // Set up axios default header
-        axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-
-        // Fetch complete profile
-        await fetchUserProfile(token);
       } else {
         setIsLoading(false);
       }
@@ -175,9 +171,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     initializeAuth();
   }, []);
 
+  // Helper function to check if token is expired
+  const checkIfTokenExpired = (token: string): boolean => {
+    try {
+      const base64Url = token.split('.')[1];
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const payload = JSON.parse(window.atob(base64));
+      
+      if (payload.exp) {
+        const expiryTime = payload.exp * 1000; // Convert to milliseconds
+        const currentTime = Date.now();
+        const timeUntilExpiry = expiryTime - currentTime;
+        
+        console.log('Token expires at:', new Date(expiryTime).toISOString());
+        console.log('Current time:', new Date(currentTime).toISOString());
+        console.log('Time until expiry:', timeUntilExpiry / 1000, 'seconds');
+        
+        return timeUntilExpiry <= 0;
+      }
+      return false;
+    } catch (error) {
+      console.error('Error checking token expiration:', error);
+      return true; // Assume expired if we can't parse it
+    }
+  };
+
   // Setup axios interceptor to handle 401 responses
   useEffect(() => {
-    const interceptor = axios.interceptors.response.use(
+    const interceptor = apiClient.interceptors.response.use(
       (response) => response,
       async (error) => {
         const originalRequest = error.config;
@@ -194,7 +215,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             originalRequest.headers['Authorization'] = `Bearer ${newToken}`;
 
             // Retry the original request
-            return axios(originalRequest);
+            return apiClient(originalRequest);
           } catch (refreshError) {
             // If refresh fails, pass through to the next error handler
             return Promise.reject(refreshError);
@@ -208,7 +229,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Clean up interceptor on unmount
     return () => {
-      axios.interceptors.response.eject(interceptor);
+      apiClient.interceptors.response.eject(interceptor);
     };
   }, [refreshingToken]);
 
@@ -216,8 +237,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem('token', token);
     localStorage.setItem('refreshToken', refreshToken);
     localStorage.setItem('user', JSON.stringify(initialUser));
-    axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+    
+    // Set authorization header for all future requests
+    apiClient.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+    
     setUser(initialUser);
+    
     // Fetch complete user profile after login
     await fetchUserProfile(token);
   };
@@ -226,9 +251,45 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.removeItem('token');
     localStorage.removeItem('refreshToken');
     localStorage.removeItem('user');
-    delete axios.defaults.headers.common['Authorization'];
+    delete apiClient.defaults.headers.common['Authorization'];
     setUser(null);
   };
+
+  useEffect(() => {
+    // Check token expiration every 60 seconds and refresh if needed
+    const tokenCheckInterval = setInterval(() => {
+      const token = localStorage.getItem('token');
+      if (!token) return;
+      
+      try {
+        const base64Url = token.split('.')[1];
+        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+        const payload = JSON.parse(window.atob(base64));
+        
+        if (payload.exp) {
+          const expiryTime = payload.exp * 1000; // Convert to milliseconds
+          const currentTime = Date.now();
+          const timeUntilExpiry = expiryTime - currentTime;
+          
+          console.log(`Token expires in: ${timeUntilExpiry / 1000} seconds`);
+          
+          // If token will expire in less than 5 minutes (300 seconds), refresh it
+          if (timeUntilExpiry > 0 && timeUntilExpiry < 300000) {
+            console.log('Token expiring soon, refreshing preemptively');
+            refreshToken().catch(err => {
+              console.error('Preemptive token refresh failed:', err);
+            });
+          }
+        }
+      } catch (error) {
+        console.error('Error checking token expiration:', error);
+      }
+    }, 60000); // Check every 60 seconds
+    
+    return () => {
+      clearInterval(tokenCheckInterval);
+    };
+  }, []);
 
   return (
     <AuthContext.Provider value={{ user, isLoading, login, logout }}>
@@ -236,6 +297,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     </AuthContext.Provider>
   );
 }
+
+// Export apiClient for use throughout the application
+export const api = apiClient;
 
 export function useAuth() {
   const context = useContext(AuthContext);

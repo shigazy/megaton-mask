@@ -213,6 +213,14 @@ class InferenceManager:
                 # Clear cache between requests
                 torch.cuda.empty_cache()
             
+            if progress_callback:
+                progress_value = min(len(results), total_frames)
+                try:
+                    progress_callback(progress_value, total_frames)
+                    print(f"[Manager.py] Updated progress: {progress_value}/{total_frames}")
+                except Exception as e:
+                    print(f"[Manager.py] Error in progress callback: {e}")
+            
             return results
         except Exception as e:
             print(f"[Manager.py] Error processing batch: {e}")
@@ -318,6 +326,13 @@ class InferenceManager:
             self.log_memory_usage("After masks generation")
             
             # The result will be correctly ordered based on the original frames
+            if progress_callback:
+                try:
+                    progress_callback(total_frames, total_frames)
+                    print(f"[Manager.py] Final progress update: {total_frames}/{total_frames}")
+                except Exception as e:
+                    print(f"[Manager.py] Error in progress callback: {e}")
+            
             return result
 
         except Exception as e:
@@ -357,6 +372,14 @@ class InferenceManager:
                     self.log_memory_usage("Before init_state")
                     state = predictor.init_state(video_path, offload_video_to_cpu=False)
                     self.log_memory_usage("After init_state")
+
+                    # After state initialization, add:
+                    if progress_callback:
+                        try:
+                            progress_callback(5, total_frames)
+                            print(f"[Manager.py] Updated progress: 5/{total_frames}")
+                        except Exception as e:
+                            print(f"[Manager.py] Error in progress callback: {e}")
                 except Exception as exc:
                     print(f"[Manager.py] Error initializing state: {exc}")
                     import traceback
@@ -366,10 +389,11 @@ class InferenceManager:
                 # Prepare masks_list - a dict for all frame results
                 masks_list = {}
                 
-                # Report progress at 0
+                # Update progress callback for initialization (5% progress)
                 if progress_callback:
                     try:
-                        progress_callback(0, total_frames)
+                        progress_callback(int(total_frames * 0.05), total_frames)
+                        print(f"[Manager.py] Updated progress: 5%")
                     except Exception as e:
                         print(f"[Manager.py] Error in progress callback: {e}")
                 
@@ -467,6 +491,14 @@ class InferenceManager:
                         except Exception as e:
                             print(f"[Manager.py] Error in progress callback: {e}")
                         
+                    # After raw_masks = predictor.propagate_in_video(...), add:
+                    if progress_callback:
+                        try:
+                            progress_callback(total_frames // 2, total_frames)
+                            print(f"[Manager.py] Updated progress: {total_frames//2}/{total_frames}")
+                        except Exception as e:
+                            print(f"[Manager.py] Error in progress callback: {e}")
+                    
                 except Exception as e:
                     print(f"[Manager.py] Error in propagate_in_video: {e}")
                     import traceback
@@ -536,6 +568,14 @@ class InferenceManager:
                     del batch_masks
                     gc.collect()
                     self.log_memory_usage(f"After batch {batch_start}-{batch_end}")
+                    
+                    if progress_callback:
+                        progress_value = min(batch_end, total_frames)
+                        try:
+                            progress_callback(progress_value, total_frames)
+                            print(f"[Manager.py] Updated progress: {progress_value}/{total_frames}")
+                        except Exception as e:
+                            print(f"[Manager.py] Error in progress callback: {e}")
                 
                 # Clear memory
                 del ordered_masks, masks_list
