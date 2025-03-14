@@ -1122,16 +1122,25 @@ export const VideoUpload = ({ onUploadSuccess, fetchVideos, initialVideo, setIni
   const generateFullMasks = async () => {
     console.log('Step 1: Starting mask generation');
     setStatus('Generating masks...', 'processing');
-    console.log('Step 2: Current bbox:', bbox);
-    console.log('Step 3: Current points:', points);
+    const currentFrame = getCurrentFrame();
+    const mask_bbox = annotation[currentFrame.toString()].bbox;
+    const mask_points = annotation[currentFrame.toString()].points;
+    console.log('Step 2: Current bbox:', mask_bbox);
+    console.log('Step 3: Current points:', mask_points);
     console.log('Step 3.5: Current initialVideo:', initialVideo);
 
-    if (!videoUrl || !bbox || !points.length) {
+    if (!videoUrl || !mask_bbox || !mask_points.length) {
       console.log('Step 4: Missing required data, returning early');
-      if (!videoUrl) console.log('Missing videoUrl');
-      if (!bbox) console.log('Missing bbox');
-      if (!points.length) console.log('Missing points');
-      setStatus('Missing required data for mask generation', 'error');
+      if (!videoUrl) {
+        console.log('Missing videoUrl');
+        setStatus('Missing video URL for mask generation', 'error');
+      } else if (!mask_bbox) {
+        console.log('Missing bbox');
+        setStatus('Missing bounding box for mask generation. Please draw a bounding box on the video.', 'error');
+      } else if (!mask_points.length) {
+        console.log('Missing points');
+        setStatus('Missing annotation points for mask generation. Please place positive and negative points on the video.', 'error');
+      }
       return;
     }
 
@@ -1151,12 +1160,13 @@ export const VideoUpload = ({ onUploadSuccess, fetchVideos, initialVideo, setIni
 
       console.log('Step 7: Preparing request body');
       const requestBody = {
-        bbox: Array.isArray(bbox) ? bbox : [bbox.x, bbox.y, bbox.w, bbox.h],
-        points: 'positive' in points ? points : {
-          positive: points.filter(p => p.type === 'positive').map(p => [p.x, p.y]),
-          negative: points.filter(p => p.type === 'negative').map(p => [p.x, p.y])
+        bbox: Array.isArray(mask_bbox) ? mask_bbox : [mask_bbox.x, mask_bbox.y, mask_bbox.w, mask_bbox.h],
+        points: 'positive' in mask_points ? mask_points : {
+          positive: mask_points.filter(p => p.type === 'positive').map(p => [p.x, p.y]),
+          negative: mask_points.filter(p => p.type === 'negative').map(p => [p.x, p.y])
         },
         super: superMasks,
+        //TO DO: Deprecate method
         method: method,
         start_frame: startFrame
       };
@@ -1788,6 +1798,7 @@ export const VideoUpload = ({ onUploadSuccess, fetchVideos, initialVideo, setIni
                   <span className="tooltip">Generate Preview Mask</span>
                 </button>
 
+                {/* TODO: Deprecate method selector 
                 <select
                   value={method}
                   onChange={(e) => setMethod(e.target.value as 'dual_process' | 'preprocess')}
@@ -1797,6 +1808,7 @@ export const VideoUpload = ({ onUploadSuccess, fetchVideos, initialVideo, setIni
                   <option value="dual_process" className="bg-[var(--card-background)] text-[var(--text-primary)]">Dual Process</option>
                   <option value="preprocess" className="bg-[var(--card-background)] text-[var(--text-primary)]">Preprocess</option>
                 </select>
+                */}
                 <button
                   onClick={generateFullMasks}
                   disabled={points.length === 0 || isMaskGenerating}

@@ -325,7 +325,6 @@ class InferenceManager:
             self.cleanup()
             torch.cuda.empty_cache()
             gc.collect()
-            
             # Use regular model for full masks
             predictor = await self.initialize(is_preview=False)
             self.log_memory_usage("After initialize in generate_full_video_masks")
@@ -354,7 +353,8 @@ class InferenceManager:
                 sam2_dir, sam2_to_original = prepare_sam2_jpg_sequence(
                     jpg_dir, 
                     total_frames, 
-                    start_frame
+                    start_frame,
+                    super_mode,
                 )
                 temp_dirs.append(sam2_dir)
                 
@@ -438,6 +438,8 @@ class InferenceManager:
             gc.collect()
             self.log_memory_usage("Before mask generation")
             print(f"[Manager.py] _generate_masks received total_frames: {total_frames}")
+
+            ## IF SUPER MODE TOTAL FRAMES WILL NEED TO BE DOUBLED
             
             # Final masks storage
             final_masks = []
@@ -457,6 +459,7 @@ class InferenceManager:
                             print(f"[Manager.py] Updated progress: 5/{total_frames}")
                         except Exception as e:
                             print(f"[Manager.py] Error in progress callback: {e}")
+
                 except Exception as exc:
                     print(f"[Manager.py] Error initializing state: {exc}")
                     import traceback
@@ -520,10 +523,11 @@ class InferenceManager:
                     print(f"[Manager.py] Calling propagation with standard parameters for {total_frames} frames")
                     
                     # Call SAM2's propagation with standard parameters
+                    sam2_frame_count = total_frames * 2 if super_mode else total_frames
                     raw_masks = list(predictor.propagate_in_video(
                         inference_state=state,
                         start_frame_idx=0,
-                        max_frame_num_to_track=total_frames,
+                        max_frame_num_to_track=sam2_frame_count,
                         reverse=False
                     ))
                     
@@ -534,11 +538,11 @@ class InferenceManager:
                             if len(raw_mask_item) >= 3:  # The tuple has 3 elements (frame_idx, obj_ids, mask_tensor)
                                 frame_idx = raw_mask_item[0]  # First element is the frame index
                                 mask = raw_mask_item[2]       # THIRD element is the mask tensor
-                                print(f"[Manager.py] Unpacked mask tuple for frame {frame_idx}")
+                                # print(f"[Manager.py] Unpacked mask tuple for frame {frame_idx}")
                                 # Now store the mask after moving it to CPU
                                 if hasattr(mask, 'cpu'):
                                     mask_np = mask.cpu().numpy()
-                                    print(f"[Manager.py] Mask shape: {mask_np.shape}")
+                                    # print(f"[Manager.py] Mask shape: {mask_np.shape}")
                                     
                                     # Ensure mask is 2D boolean by taking the first channel if needed
                                     if len(mask_np.shape) == 4:  # [B, C, H, W]
@@ -562,7 +566,9 @@ class InferenceManager:
                     # Update progress after processing all masks
                     if progress_callback:
                         try:
-                            progress_callback(min(total_frames, 1), total_frames)
+                            # Scale processed frames to original video length for progress reporting
+                            scaled_progress = min(int((frame_idx / sam2_frame_count) * total_frames), total_frames)
+                            progress_callback(scaled_progress, total_frames)
                         except Exception as e:
                             print(f"[Manager.py] Error in progress callback: {e}")
                         
@@ -586,28 +592,51 @@ class InferenceManager:
                 print("[Manager.py] Generating final masks...")
                 final_masks = []
                 
-                # Convert frame-indexed dict to a list in the ORIGINAL video order
-                ordered_masks = []
-                for sam2_idx in range(total_frames):
+                # Dictionary to store combined masks by original frame index
+                combined_masks = {}
+                combined_counts = {}  # Track how many masks were combined for each frame
+
+                # Process all SAM2 frames (could be up to 2x total_frames in super_mode)
+                sam2_frame_count = total_frames * 2 if super_mode else total_frames
+                for sam2_idx in range(sam2_frame_count):
                     if sam2_idx in masks_list:
                         # Get the mask for this SAM2 frame
                         mask = masks_list[sam2_idx]
                         
-                        # If we have a mapping, convert back to original frame index
+                        # Map to original frame index
                         if sam2_to_original:
                             original_idx = sam2_to_original.get(sam2_idx, sam2_idx)
                         else:
                             original_idx = sam2_idx
                         
-                        # Add to ordered list, ensuring the original order is maintained
-                        while len(ordered_masks) <= original_idx:
-                            ordered_masks.append(None)
-                        ordered_masks[original_idx] = mask
+                        # Make sure the original index is valid for the output video
+                        if 0 <= original_idx < total_frames:
+                            # Combine masks for the same original frame using logical OR
+                            if original_idx in combined_masks:
+                                combined_masks[original_idx] = np.logical_or(combined_masks[original_idx], mask)
+                                combined_counts[original_idx] += 1
+                            else:
+                                combined_masks[original_idx] = mask
+                                combined_counts[original_idx] = 1
+
+                # Print statistics about mask combination
+                if super_mode:
+                    frames_with_multiple = sum(1 for count in combined_counts.values() if count > 1)
+                    print(f"[Manager.py] Combined masks for {frames_with_multiple} frames in super mode")
+                
+                # Now convert combined_masks to ordered_masks
+                ordered_masks = []
+                for orig_idx in range(total_frames):
+                    if orig_idx in combined_masks:
+                        ordered_masks.append(combined_masks[orig_idx])
+                    else:
+                        # Create an empty mask if missing
+                        print(f"[Manager.py] Warning: Missing mask for original frame {orig_idx}")
+                        ordered_masks.append(np.zeros((height, width), dtype=bool))
                 
                 # Fill any gaps in ordered_masks
                 for i in range(len(ordered_masks)):
                     if ordered_masks[i] is None:
-                        print(f"[Manager.py] Warning: Missing mask for original frame {i}")
                         ordered_masks[i] = np.zeros((height, width), dtype=bool)
                 
                 # Save ordered masks for debugging

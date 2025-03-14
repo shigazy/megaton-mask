@@ -87,7 +87,6 @@ async def process_video_masks(
         temp_video = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4')
         temp_files.append(temp_video.name)
         
-        # Download the original video (not forward-reverse)
         s3_client.download_file(BUCKET_NAME, video.s3_key, temp_video.name)
         original_video_path = temp_video.name
         
@@ -119,13 +118,9 @@ async def process_video_masks(
             logger.info("No JPG sequence available, using video file")
             process_video_path = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4')
             temp_files.append(process_video_path.name)
-            
-            if super and video.forward_reverse_key:
-                logger.info("Using forward-reverse video")
-                s3_client.download_file(BUCKET_NAME, video.forward_reverse_key, process_video_path.name)
-            else:
-                logger.info("Using original video")
-                s3_client.download_file(BUCKET_NAME, video.s3_key, process_video_path.name)
+         
+            logger.info("Using original video")
+            s3_client.download_file(BUCKET_NAME, video.s3_key, process_video_path.name)
                 
             jpg_dir_key = None
 
