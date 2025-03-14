@@ -45,7 +45,6 @@ interface AnnotationLayerProps {
   getCurrentFrame: () => number;
   onBboxDragStart: () => void;
   onBboxDragEnd: () => void;
-  setDrawMode: (mode: 'bbox' | 'points') => void;
 }
 
 interface UploadResponse {
@@ -107,10 +106,10 @@ const AnnotationLayer = ({
   videoWidth,
   videoHeight,
   drawMode,
-  setDrawMode,
   pointType,
   points,
   bbox,
+  setDrawMode,
   getCurrentFrame,
   onBboxChange,
   onPointsChange,
@@ -424,7 +423,7 @@ const AnnotationLayer = ({
   );
 };
 
-export const VideoUpload = ({ onUploadSuccess, fetchVideos, initialVideo,setInitialVideo, fps }: VideoUploadProps) => {
+export const VideoUpload = ({ onUploadSuccess, fetchVideos, initialVideo, setInitialVideo, fps }: VideoUploadProps) => {
   const { setStatus } = useStatus();
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -845,14 +844,14 @@ export const VideoUpload = ({ onUploadSuccess, fetchVideos, initialVideo,setInit
             // Enhanced progress calculation
             const total = progressEvent.total || file.size;
             const loaded = progressEvent.loaded;
-            
+
             // Calculate percentage - divide into phases:
             // - 0-90%: Actual upload
             // - 90-100%: Server processing
             const uploadPercentage = Math.min(90, Math.round((loaded * 90) / total));
-            
+
             setProgress(uploadPercentage);
-            
+
             if (uploadPercentage === 90) {
               setStatus(`Processing ${file.name}...`, 'processing');
             } else {
@@ -886,11 +885,11 @@ export const VideoUpload = ({ onUploadSuccess, fetchVideos, initialVideo,setInit
       setStatus(`Successfully uploaded ${file.name}`, 'success');
     } catch (error) {
       console.error('Upload failed:', error);
-      
+
       // Handle authentication errors specifically
       if (axios.isAxiosError(error) && error.response?.status === 401) {
         setStatus(`Session expired. Please refresh the page and try again.`, 'error');
-        
+
         // Force authentication refresh
         try {
           await refreshToken();
@@ -959,10 +958,6 @@ export const VideoUpload = ({ onUploadSuccess, fetchVideos, initialVideo,setInit
 
   const handleVideoLoad = (e: React.SyntheticEvent<HTMLVideoElement>) => {
     const video = e.currentTarget;
-    console.log('Video loaded with dimensions:', {
-      width: video.videoWidth,
-      height: video.videoHeight
-    });
     setVideoDimensions({
       width: video.videoWidth,
       height: video.videoHeight
@@ -1579,6 +1574,7 @@ export const VideoUpload = ({ onUploadSuccess, fetchVideos, initialVideo,setInit
                   onPointClick={handlePointInteraction}
                   onBboxDragStart={handleBboxDragStart}
                   onBboxDragEnd={handleBboxDragEnd}
+                  setDrawMode={setDrawMode}
                   getCurrentFrame={getCurrentFrame}
                   forceRedrawRef={forceRedrawRef}
                   redrawTrigger={redrawTrigger}

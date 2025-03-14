@@ -144,15 +144,33 @@ export default function Home() {
 
   const handleVideoSelect = async (videoId: string) => {
     console.log('Video selected:', videoId);
-    const sortedVideos = await fetchAndReturn();
 
-    const video = sortedVideos.find(v => v.id === videoId);
-    if (video) {
-      console.log('Setting selected video:', video); // Already has correct S3 URLs
+
+    // Fetch the full video details from the API
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/videos/${videoId}`, {
+        method: 'GET',
+        credentials: 'include',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const videoData = await response.json();
+      console.log('Fetched video details:', videoData);
+
+      // Update the video with the full details
+      setSelectedVideo(videoData);
       setActiveVideoId(videoId);
-      setSelectedVideo(video);
+    } catch (error) {
+      console.error('Error fetching video details:', error);
     }
-  };
+  }
 
   const handleDeleteVideo = async (videoId: string) => {
     try {

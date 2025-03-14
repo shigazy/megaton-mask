@@ -378,31 +378,23 @@ async def upload_video(
 
 @app.get("/api/videos")
 async def get_videos(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    videos = db.query(Video).filter(Video.user_id == current_user.id).all()
+
+    ## TODO: Deprecate bbox, points, forward_reverse_key 
+    videos = db.query(Video).filter(Video.user_id == current_user.id).with_entities(
+        Video.title, Video.s3_key, Video.thumbnail_key, Video.created_at, Video.mask_key, 
+        Video.bbox, Video.points, Video.id, Video.mask_key, Video.bbox, Video.points, Video.forward_reverse_key,
+        Video.video_metadata, Video.video_keys, Video.jpg_dir_key
+    ).all()
     
     video_list = []
     for video in videos:
         # Generate presigned URLs for both video and thumbnail
-        video_url = s3_client.generate_presigned_url(
-            'get_object',
-            Params={'Bucket': BUCKET_NAME, 'Key': video.s3_key},
-            ExpiresIn=3600
-        )
         
         thumbnail_url = None
         if video.thumbnail_key:
             thumbnail_url = s3_client.generate_presigned_url(
                 'get_object',
                 Params={'Bucket': BUCKET_NAME, 'Key': video.thumbnail_key},
-                ExpiresIn=3600
-            )
-
-        # Reset mask_url for each video
-        mask_url = None
-        if video.mask_key:
-            mask_url = s3_client.generate_presigned_url(
-                'get_object',
-                Params={'Bucket': BUCKET_NAME, 'Key': video.mask_key},
                 ExpiresIn=3600
             )
         greenscreen_url = None
@@ -412,20 +404,83 @@ async def get_videos(current_user: User = Depends(get_current_user), db: Session
                 Params={'Bucket': BUCKET_NAME, 'Key': video.video_keys['greenscreen']},
                 ExpiresIn=3600
             )
+
         video_list.append({
             "id": video.id,
             "title": video.title,
-            "videoUrl": video_url,
+            "videoUrl": video.s3_key,
             "thumbnailUrl": thumbnail_url,
             "createdAt": video.created_at,
             "bbox": video.bbox,
             "points": video.points,
-            "maskUrl": mask_url,
+            "maskUrl":  video.mask_key,
             "greenscreenUrl": greenscreen_url,
-            "annotation": video.annotation
         })
     
     return {"videos": video_list}
+
+@app.get("/api/videos/{video_id}")
+async def get_video(video_id: str, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+
+    ## TODO: Deprecate bbox, points, forward_reverse_key 
+    video = db.query(Video).filter(
+        Video.id == video_id,
+        Video.user_id == current_user.id
+    ).first()
+    
+    if not video:
+        raise HTTPException(status_code=404, detail="Video not found")
+    
+    # Generate presigned URLs for both video and thumbnail
+    video_url = s3_client.generate_presigned_url(
+        'get_object',
+        Params={'Bucket': BUCKET_NAME, 'Key': video.s3_key},
+        ExpiresIn=3600
+    )
+    
+    thumbnail_url = None
+    if video.thumbnail_key:
+        thumbnail_url = s3_client.generate_presigned_url(
+            'get_object',
+            Params={'Bucket': BUCKET_NAME, 'Key': video.thumbnail_key},
+            ExpiresIn=3600
+        )
+
+    # Reset mask_url for each video
+    mask_url = None
+    if video.mask_key:
+        mask_url = s3_client.generate_presigned_url(
+            'get_object',
+            Params={'Bucket': BUCKET_NAME, 'Key': video.mask_key},
+            ExpiresIn=3600
+        )
+    greenscreen_url = None
+    if video.video_keys and video.video_keys.get('greenscreen'):
+        greenscreen_url = s3_client.generate_presigned_url(
+            'get_object',
+            Params={'Bucket': BUCKET_NAME, 'Key': video.video_keys['greenscreen']},
+            ExpiresIn=3600
+        )
+    
+    # Create response object with video details and URLs
+    video_response = {
+        "id": video.id,
+        "title": video.title,
+        "videoUrl": video_url,
+        "thumbnailUrl": thumbnail_url,
+        "createdAt": video.created_at,
+        "bbox": video.bbox,
+        "points": video.points,
+        "maskUrl": mask_url,
+        "mask_key": video.mask_key,
+        "annotation": video.annotation,
+        "greenscreenUrl": greenscreen_url,
+        "video_metadata": video.video_metadata,
+        "video_keys": video.video_keys
+    }
+    
+    return video_response
+
 
 @app.delete("/api/videos/{video_id}")
 async def delete_video(
