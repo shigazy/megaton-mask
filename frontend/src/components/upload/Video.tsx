@@ -990,52 +990,54 @@ export const VideoUpload = ({ onUploadSuccess, fetchVideos, initialVideo,setInit
 
         // Format the request data
         const requestData = {
-          points: {
-            positive: currentPoints
-              .filter(p => p.type === 'positive')
-              .map(p => [p.x, p.y]),
-            negative: currentPoints
-              .filter(p => p.type === 'negative')
-              .map(p => [p.x, p.y])
-          },
-          bbox: currentBbox,
+          points: annotation[currentFrame].points,
+          bbox: annotation[currentFrame].bbox,
           current_frame: currentFrame
         };
 
-        console.log('Sending request with data:', JSON.stringify(requestData, null, 2));
+        console.log('Sending request with data [preview-mask]:', JSON.stringify(requestData, null, 2));
 
-        const response = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/api/videos/${initialVideo?.id}/preview-mask`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${localStorage.getItem('token')}`
-            },
-            body: JSON.stringify(requestData),
-            signal: controller.signal
+        try {
+          // Proper axios response handling
+          const response = await axios.post(
+            `${process.env.NEXT_PUBLIC_API_URL}/api/videos/${initialVideo?.id}/preview-mask`,
+            requestData,
+            {
+              headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+              },
+              signal: controller.signal
+            }
+          );
+
+          // With axios, data is already parsed 
+          console.log('Received mask data:', response.data);
+          // Store the mask in the annotation object for the current frame
+          const currentFrame = getCurrentFrame();
+          setAnnotation(prev => {
+            const updatedAnnotation = { ...prev };
+            if (!updatedAnnotation[currentFrame]) {
+              updatedAnnotation[currentFrame] = { points: [], bbox: null, mask_data: null };
+            }
+            updatedAnnotation[currentFrame].mask_data = response.data;
+            return updatedAnnotation;
+          });
+          setMaskData(response.data);
+          setStatus('Preview mask generated');
+        } catch (error) {
+          if (axios.isCancel(error)) {
+            console.log('Request aborted as new request started');
+          } else {
+            console.error('Error generating preview:', error);
+            setStatus('Failed to generate preview mask', 'error');
           }
-        );
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error('Server response:', errorText);
-          throw new Error(`Failed to generate preview: ${errorText}`);
         }
-
-        const data = await response.json();
-        console.log('Received mask data:', data);
-        setMaskData(data);
-        setStatus('Preview mask generated');
       } catch (error) {
-        if (error instanceof Error && error.name === 'AbortError') {
-          console.log('Request aborted as new request started');
-        } else {
-          console.error('Error generating preview:', error);
-        }
+        console.error('Error in preview mask generation:', error);
+        setStatus('Error processing mask request', 'error');
       }
     }, 500),
-    [initialVideo?.id]
+    [initialVideo?.id, annotation]
   );
 
   // Cleanup abort controller on unmount

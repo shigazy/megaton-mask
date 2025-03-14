@@ -10,6 +10,9 @@ import axios from 'axios';
 
 type ViewMode = 'grid' | 'list';
 
+// Add type for sort options
+type SortOption = 'newest' | 'oldest' | 'name-asc' | 'name-desc';
+
 interface VideoGalleryProps {
   videos: Video[];
   onSelectVideo: (videoId: string, videoUrl?: string) => void;
@@ -40,9 +43,39 @@ export const VideoGallery = ({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [videoToDelete, setVideoToDelete] = useState<string | null>(null);
 
-  // Calculate pagination
-  const totalPages = Math.ceil(videos.length / itemsPerPage);
-  const paginatedVideos = videos.slice(
+  // Add state for sorting
+  const [sortBy, setSortBy] = useState<SortOption>('newest');
+
+  // Function to sort videos based on selected option
+  const getSortedVideos = useCallback((videoList: Video[]) => {
+    const sortedVideos = [...videoList];
+    
+    switch (sortBy) {
+      case 'newest':
+        return sortedVideos.sort((a, b) => 
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
+      case 'oldest':
+        return sortedVideos.sort((a, b) => 
+          new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+        );
+      case 'name-asc':
+        return sortedVideos.sort((a, b) => 
+          a.title.localeCompare(b.title)
+        );
+      case 'name-desc':
+        return sortedVideos.sort((a, b) => 
+          b.title.localeCompare(a.title)
+        );
+      default:
+        return sortedVideos;
+    }
+  }, [sortBy]);
+
+  // Update pagination to use sorted videos
+  const sortedVideos = getSortedVideos(videos);
+  const totalPages = Math.ceil(sortedVideos.length / itemsPerPage);
+  const paginatedVideos = sortedVideos.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
@@ -152,7 +185,7 @@ export const VideoGallery = ({
     try {
       const token = localStorage.getItem('token');
       if (!token) return;
-
+      console.log('Refreshing video URL for [VideoGallery.tsx]:', videoId);
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/videos/${videoId}/refresh-url`, {
         headers: {
           'Authorization': `Bearer ${token}`
@@ -191,6 +224,7 @@ export const VideoGallery = ({
   // Refresh URL when video is selected
   useEffect(() => {
     if (activeVideoId) {
+      console.log('Refreshing video URL for [VideoGallery.tsx, UseEffect - 2]:', activeVideoId);
       refreshVideoUrl(activeVideoId);
     }
   }, [activeVideoId]);
@@ -296,6 +330,29 @@ export const VideoGallery = ({
   const cancelDelete = () => {
     setVideoToDelete(null);
     setShowDeleteConfirm(false);
+  };
+
+  // UI for the sort dropdown
+  const renderSortDropdown = () => {
+    return (
+      <div className="relative">
+        <select
+          value={sortBy}
+          onChange={(e) => setSortBy(e.target.value as SortOption)}
+          className="appearance-none bg-[var(--bg-color)] border border-[var(--border-color)] rounded-lg py-2 pl-3 pr-8 text-sm focus:outline-none focus:ring-1 focus:ring-[var(--accent-purple)]"
+        >
+          <option value="newest">Newest First</option>
+          <option value="oldest">Oldest First</option>
+          <option value="name-asc">Name (A-Z)</option>
+          <option value="name-desc">Name (Z-A)</option>
+        </select>
+        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-[var(--text-secondary)]">
+          <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+            <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" />
+          </svg>
+        </div>
+      </div>
+    );
   };
 
   const renderGridView = () => (
@@ -666,20 +723,26 @@ export const VideoGallery = ({
             </div>
           </div>
 
-          {/* View Mode Toggle */}
-          <div className="flex items-center gap-2 border border-[var(--border-color)] rounded-lg">
-            <button
-              onClick={() => setViewMode('grid')}
-              className={`p-2 ${viewMode === 'grid' ? 'text-[var(--accent-purple)]' : 'text-[var(--text-secondary)]'}`}
-            >
-              <FaThLarge className="h-4 w-4" />
-            </button>
-            <button
-              onClick={() => setViewMode('list')}
-              className={`p-2 ${viewMode === 'list' ? 'text-[var(--accent-purple)]' : 'text-[var(--text-secondary)]'}`}
-            >
-              <FaList className="h-4 w-4" />
-            </button>
+          {/* Controls Group - Now includes Sort Dropdown */}
+          <div className="flex items-center gap-3">
+            {/* Sort Dropdown */}
+            {renderSortDropdown()}
+            
+            {/* View Mode Toggle */}
+            <div className="flex items-center gap-2 border border-[var(--border-color)] rounded-lg">
+              <button
+                onClick={() => setViewMode('grid')}
+                className={`p-2 ${viewMode === 'grid' ? 'text-[var(--accent-purple)]' : 'text-[var(--text-secondary)]'}`}
+              >
+                <FaThLarge className="h-4 w-4" />
+              </button>
+              <button
+                onClick={() => setViewMode('list')}
+                className={`p-2 ${viewMode === 'list' ? 'text-[var(--accent-purple)]' : 'text-[var(--text-secondary)]'}`}
+              >
+                <FaList className="h-4 w-4" />
+              </button>
+            </div>
           </div>
         </div>
 

@@ -3,6 +3,8 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from datetime import datetime
 import uuid
+from pydantic import BaseModel
+from typing import Dict, List, Optional, Union
 
 
 # IMPORTANT: When adding new columns to any table, remember to update the add_columns() function
@@ -116,3 +118,18 @@ class RefreshToken(Base):
     used = Column(Boolean, default=False)
     
     user = relationship("User", back_populates="refresh_tokens")
+
+class BoundingBox(BaseModel):
+    x: float
+    y: float
+    w: float
+    h: float
+
+class PointsData(BaseModel):
+    positive: List[List[float]]
+    negative: List[List[float]]
+
+class MaskGenerationRequest(BaseModel):
+    points: PointsData
+    bbox: Optional[BoundingBox] = None
+    current_frame: int = 0

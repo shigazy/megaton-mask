@@ -239,8 +239,6 @@ export const PlayBar: React.FC<PlayBarProps> = ({
                         ? (frame / totalFrames) * 100
                         : 0;
 
-                    console.log(`Frame ${frame} position: ${position.toFixed(2)}%`);
-
                     // Skip markers that would be off-screen
                     if (position < 0 || position > 100) {
                         console.log(`Skipping frame ${frame} - position out of range (${position}%)`);

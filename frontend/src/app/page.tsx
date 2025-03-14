@@ -46,6 +46,7 @@ export default function Home() {
     try {
       // Get token from localStorage
       const token = localStorage.getItem('token');
+      console.log('Fetching Videos:', videos);
 
       if (!token) {
         console.log('No token found, user might need to login');
@@ -63,7 +64,7 @@ export default function Home() {
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-
+      console.log('Response:', response, 'Response.ok:', response.ok);
       const data = await response.json();
       console.log('Raw API response:', data);
 
@@ -133,7 +134,10 @@ export default function Home() {
 
   useEffect(() => {
     const token = localStorage.getItem('token');
+    console.log('Token:', token);
+    console.log('User:', user);
     if (user && token) {
+      console.log('Fetching videos');
       fetchVideos();
     }
   }, [user]);

@@ -285,6 +285,8 @@ def create_greenscreen_video(original_video_path: str, mask_video_path: str, out
     width = int(original.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(original.get(cv2.CAP_PROP_FRAME_HEIGHT))
     fps = original.get(cv2.CAP_PROP_FPS)
+    mask_fps = mask.get(cv2.CAP_PROP_FPS)
+    print(f"[VideoUtils] - Width: {width}, Height: {height}, FPS: {fps}, Mask FPS: {mask_fps}")
     
     # Create video writer
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')

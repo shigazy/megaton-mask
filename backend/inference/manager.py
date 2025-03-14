@@ -15,7 +15,7 @@ import gc
 import time
 import shutil
 import uuid
-from .utils.jpg_sequence import download_jpg_sequence, prepare_sam2_jpg_sequence
+from .utils.jpg_sequence import download_jpg_sequence, download_jpg, prepare_sam2_jpg_sequence
 
 sys.path.append("./sam2")
 from sam2.build_sam import build_sam2_video_predictor
@@ -114,46 +114,68 @@ class InferenceManager:
             print(f"[Manager.py] Error initializing predictor: {e}")
             raise
 
-    async def generate_mask(self, video_path, points, bbox, start_frame=0):
-        """Generate preview mask using tiny model"""
-        print(f"[Manager.py] generate_mask called with video_path: {video_path}, starting from frame: {start_frame}")
-        
-        # Check cache first
-        cache_key = f"{video_path}:{str(points)}:{str(bbox)}:{start_frame}"
-        cached_result = self.cache.get(cache_key, None, None)
-        if cached_result is not None:
-            return cached_result
+    async def generate_mask(self, video_path, points, bbox, start_frame, jpg_dir_key: Optional[str] = None):
+        """
+        Generate preview mask using tiny model.
+        If jpg_dir_key is provided, download the JPG file for the specified frame
+        for inference instead of using the video.
+        """
+        print(f"[Manager.py] generate_mask called with video_path: {video_path}, start_frame: {start_frame}")
+        print(f"[Manager.py] jpg_dir_key: {jpg_dir_key}")
+        temp_dirs = []  # To track temporary directories for cleanup
 
         try:
-            # Use tiny model for previews
-            predictor = await self.initialize(is_preview=True)
-            
+            # If a JPG sequence key is provided, use it to get the specific frame image.
+            if jpg_dir_key:
+                print(f"[Manager.py] Processing preview mask using JPG frame from: {jpg_dir_key}")
+                # download_jpg returns the local file path to the specific frame
+                process_path = download_jpg(jpg_dir_key, start_frame)
+                # Store the temporary directory for cleanup.
+                temp_dirs.append(os.path.dirname(process_path))
+                print(f"[Manager.py] Using JPG file for inference: {process_path}")
+            else:
+                process_path = video_path
+                print(f"[Manager.py] Using video file for inference: {process_path}")
+
+            # Transform points if they are provided as a list instead of a dict.
+            if isinstance(points, list):
+                grouped_points = {'positive': [], 'negative': []}
+                for p in points:
+                    if p.get('type') == 'positive':
+                        grouped_points['positive'].append([p['x'], p['y']])
+                    elif p.get('type') == 'negative':
+                        grouped_points['negative'].append([p['x'], p['y']])
+                points = grouped_points
+
+            # Initialize the predictor (using full model for propagation)
+            predictor = await self.initialize(is_preview=False)
             with torch.inference_mode(), torch.autocast("cuda", dtype=torch.float16):
                 if self.current_state is None:
-                    print(f"[Manager.py] Initializing state with video_path: {video_path}")
+                    print(f"[Manager.py] Initializing state with process_path: {process_path}")
                     self.log_memory_usage("Before init_state")
-                    state = predictor.init_state(video_path, offload_video_to_cpu=True)
+                    # For a JPG file, offloading the video to CPU is not needed.
+                    self.current_state = predictor.init_state(process_path, offload_video_to_cpu=(jpg_dir_key is None))
                     self.log_memory_usage("After init_state")
 
-                # Prepare points
+                # Prepare points and labels arrays.
                 all_points = []
                 all_labels = []
-                
-                if points.get('positive'):
+                if points and 'positive' in points and points['positive']:
                     all_points.extend(points['positive'])
                     all_labels.extend([1] * len(points['positive']))
-                    
-                if points.get('negative'):
+                if points and 'negative' in points and points['negative']:
                     all_points.extend(points['negative'])
                     all_labels.extend([0] * len(points['negative']))
-
                 points_array = np.array(all_points) if all_points else None
-                labels_array = np.array(all_labels) if all_points else None
+                labels_array = np.array(all_labels) if all_labels else None
 
-                # Generate mask - now using the provided start_frame
+                print(f"[Manager.py] Points array: {points_array}")
+                print(f"[Manager.py] Labels array: {labels_array}")
+
+                # Add points/box to the first frame
                 frame_idx, obj_ids, masks = predictor.add_new_points_or_box(
                     self.current_state,
-                    frame_idx=start_frame,  # Use the provided start_frame instead of 0
+                    frame_idx=0,  # Process a single frame preview.
                     obj_id=0,
                     points=points_array,
                     labels=labels_array,
@@ -163,27 +185,78 @@ class InferenceManager:
 
                 if masks is None or len(masks) == 0:
                     raise ValueError("No masks generated")
-
-                # Process first frame only for preview
-                mask = masks[0][0].cpu().numpy()
-                result = mask > 0.0
-
-                # Clear GPU memory
-                del masks
-                torch.cuda.empty_cache()
-                self.log_memory_usage("After mask processing")
-
-                # Cache the result
-                self.cache.set(cache_key, None, None, result)
                 
+                print(f"[Manager.py] Initial masks: {masks}, length: {len(masks)}")
+                
+                # Propagate the mask to at least 3 frames
+                print(f"[Manager.py] Propagating mask to frame 3...")
+                raw_masks = list(predictor.propagate_in_video(
+                    inference_state=self.current_state,
+                    start_frame_idx=0,
+                    max_frame_num_to_track=4,  # Need at least 4 frames to get to index 3
+                    reverse=False
+                ))
+                
+                print(f"[Manager.py] Collected {len(raw_masks)} propagated masks")
+                
+                # Process the propagated masks to extract frame 3
+                masks_list = {}
+                for raw_mask_item in raw_masks:
+                    if isinstance(raw_mask_item, tuple) and len(raw_mask_item) >= 3:
+                        frame_idx = raw_mask_item[0]  # First element is the frame index
+                        mask_tensor = raw_mask_item[2]  # THIRD element is the mask tensor
+                        print(f"[Manager.py] Unpacked mask tuple for frame {frame_idx}")
+                        
+                        if hasattr(mask_tensor, 'cpu'):
+                            mask_np = mask_tensor.cpu().numpy()
+                            
+                            # Ensure mask is 2D boolean
+                            if len(mask_np.shape) == 4:  # [B, C, H, W]
+                                mask_np = mask_np[0, 0] > 0.0  # Take first batch, first channel
+                            elif len(mask_np.shape) == 3:  # [C, H, W]
+                                mask_np = mask_np[0] > 0.0  # Take first channel
+                            else:
+                                mask_np = mask_np > 0.0
+                            
+                            masks_list[frame_idx] = mask_np
+                
+                # Check if we have frame 3
+                if 2 in masks_list:
+                    result = masks_list[2]
+                    print(f"[Manager.py] Returning mask for frame 2 with shape: {result.shape}")
+                else:
+                    # Fallback to frame 0 if frame 3 is not available
+                    print(f"[Manager.py] Frame 2 not found, using frame 0 instead")
+                    if 0 in masks_list:
+                        result = masks_list[0]
+                    else:
+                        print(f"[Manager.py] Frame 0 not found, using frame 1 instead")
+                        # Last resort: use the initial mask
+                        mask_np = masks[0][0].cpu().numpy()
+                        result = mask_np > 0.0
+
+                # Cache the result with a key based on the input parameters.
+                cache_key = f"{video_path}:{str(points)}:{str(bbox)}:{start_frame}"
+                self.cache.set(cache_key, None, None, result)
+
                 return result
 
         except Exception as e:
             print(f"[Manager.py] Error in generate_mask: {e}")
+            import traceback
+            traceback.print_exc()
             raise
         finally:
-            # Don't fully cleanup here as it might be called in a batch
+            # Cleanup temporary directories created by download_jpg.
+            for temp_dir in temp_dirs:
+                try:
+                    if os.path.exists(temp_dir):
+                        shutil.rmtree(temp_dir)
+                        print(f"[Manager.py] Removed temporary directory: {temp_dir}")
+                except Exception as ex:
+                    print(f"[Manager.py] Error removing temporary directory {temp_dir}: {ex}")
             torch.cuda.empty_cache()
+            gc.collect()
 
     def cleanup(self):
         """Cleanup resources"""
@@ -205,21 +278,24 @@ class InferenceManager:
                 points = request.get('points')
                 labels = request.get('labels')
                 bbox = request.get('bbox')
+                frame = request.get('current_frame')
+                jpg_dir_key = request.get('jpg_dir_key')
                 
                 # Generate mask for each request in batch
-                mask = await self.generate_mask(video_path, points, bbox)
+                mask = await self.generate_mask(video_path, points, bbox, frame, jpg_dir_key)
                 results.append(mask)
                 
                 # Clear cache between requests
                 torch.cuda.empty_cache()
             
-            if progress_callback:
-                progress_value = min(len(results), total_frames)
-                try:
-                    progress_callback(progress_value, total_frames)
-                    print(f"[Manager.py] Updated progress: {progress_value}/{total_frames}")
-                except Exception as e:
-                    print(f"[Manager.py] Error in progress callback: {e}")
+            # TODO: if progress updates break in generate full mask, it's here that's the issue
+            # if progress_callback:
+            #     progress_value = min(len(results), total_frames)
+            #     try:
+            #         progress_callback(progress_value, total_frames)
+            #         print(f"[Manager.py] Updated progress: {progress_value}/{total_frames}")
+            #     except Exception as e:
+            #         print(f"[Manager.py] Error in progress callback: {e}")
             
             return results
         except Exception as e:
@@ -361,6 +437,7 @@ class InferenceManager:
             torch.cuda.empty_cache()
             gc.collect()
             self.log_memory_usage("Before mask generation")
+            print(f"[Manager.py] _generate_masks received total_frames: {total_frames}")
             
             # Final masks storage
             final_masks = []
@@ -452,8 +529,6 @@ class InferenceManager:
                     
                     print(f"[Manager.py] Collecting propagated masks...")
                     for raw_mask_item in raw_masks:
-                        print(f"[Manager.py] Processing mask item: {raw_mask_item}")
-                        print(f"[Manager.py] Processing mask item type: {type(raw_mask_item)}")
                         # Handle the case where raw_mask_item is a tuple (which appears to be the case)
                         if isinstance(raw_mask_item, tuple):
                             if len(raw_mask_item) >= 3:  # The tuple has 3 elements (frame_idx, obj_ids, mask_tensor)

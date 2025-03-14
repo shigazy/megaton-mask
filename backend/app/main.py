@@ -113,6 +113,7 @@ class UserRegister(BaseModel):
 class MaskGenerationRequest(BaseModel):
     bbox: List[float]
     points: Dict[str, List[List[float]]]
+    current_frame: int
 
 # Define the request model at the top of the file
 class GenerateMasksRequest(BaseModel):
@@ -496,42 +497,50 @@ async def startup_event():
 @app.post("/api/videos/{video_id}/preview-mask")
 async def generate_preview_mask(
     video_id: str,
-    request_data: MaskGenerationRequest,
+    request_data: dict,
     background_tasks: BackgroundTasks,
-    start_frame: int = Body(0),  # Add start_frame parameter with default value
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     video_path = None
     try:
+        print("request_data:", request_data)
         # Get video path
         video = db.query(Video).filter(Video.id == video_id).first()
         if not video:
             raise HTTPException(status_code=404, detail="Video not found")
             
-        # Download video from S3 to temp file
-        with tempfile.NamedTemporaryFile(delete=False, suffix='.mp4') as temp_file:
-            try:
-                s3_client.download_file(BUCKET_NAME, video.s3_key, temp_file.name)
-                video_path = temp_file.name
-            except Exception as e:
-                logger.error(f"Failed to download video: {str(e)}")
-                raise HTTPException(status_code=500, detail="Failed to download video")
-                
-        print("request_data.bbox", request_data.bbox)
-        print("request_data.points", request_data.points)
-        print("video_path", video_path)
-        print("request_data.current_frame", request_data.current_frame)
+        # Check if we have jpg_dir_key or need to download video
+        if video.jpg_dir_key:
+            # Use the JPG sequence directly from S3
+            video_path = None
+            print(f"Using JPG sequence from S3: {video.jpg_dir_key}")
+        else:
+            # Download video from S3 to temp file
+            with tempfile.NamedTemporaryFile(delete=False, suffix='.mp4') as temp_file:
+                try:
+                    s3_client.download_file(BUCKET_NAME, video.s3_key, temp_file.name)
+                    video_path = temp_file.name
+                except Exception as e:
+                    logger.error(f"Failed to download video: {str(e)}")
+                    raise HTTPException(status_code=500, detail="Failed to download video")
+        
+        # Use dictionary access since request_data is now a dict
+        print("request_data bbox:", request_data.get('bbox'))
+        print("request_data points:", request_data.get('points'))
+        print("video_path:", video_path)
+        print("request_data current_frame:", request_data.get('current_frame'))
 
         # Create the batch request data properly
         batch_request = {
             'video_path': video_path,
-            'points': request_data.points,
-            'bbox': request_data.bbox,
-            'current_frame': request_data.current_frame
+            'points': request_data.get('points'),
+            'bbox': request_data.get('bbox'),
+            'current_frame': request_data.get('current_frame', 0),
+            'jpg_dir_key': video.jpg_dir_key
         }
         
-        print("Sending batch request:", batch_request)  # Debug print
+        print("Sending batch request:", batch_request)
         
         # Use the batch processor
         mask = await inference_manager.batch_processor.add_request(batch_request)

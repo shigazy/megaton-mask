@@ -80,10 +80,29 @@ async def process_video_masks(
         db = SessionLocal()
         video = db.query(Video).filter(Video.id == video_id).first()
         task = db.query(Task).filter(Task.id == task_id).first()
+
+        # If we used JPG sequence and don't have a local video file
+        # We need to download the original video for greenscreen processing
+        logger.info("Downloading original video for greenscreen processing")
+        temp_video = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4')
+        temp_files.append(temp_video.name)
         
-        # Get fps from video metadata
-        fps = video.video_metadata.get('fps', 24) if video.video_metadata else 24
-        logger.info(f"Using fps: {fps} from video metadata")
+        # Download the original video (not forward-reverse)
+        s3_client.download_file(BUCKET_NAME, video.s3_key, temp_video.name)
+        original_video_path = temp_video.name
+        
+        # Get fps from the original video file
+        cap = cv2.VideoCapture(original_video_path)
+        fps = cap.get(cv2.CAP_PROP_FPS) if cap.isOpened() else 24
+        # Get frame count from the original video file
+        frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) if cap.isOpened() else 0
+        print(f"Extracted frame count from original video: {frame_count}")
+        
+        # Check if the frame count is valid
+        if frame_count <= 0:
+            logger.warning(f"Invalid frame count ({frame_count}) detected in video {video_id}")
+        cap.release()
+        print(f"Extracted fps from original video: {fps}")
         
         if not video:
             raise ValueError(f"Video {video_id} not found")
@@ -254,18 +273,6 @@ async def process_video_masks(
 
         # Split the greenscreen creation into a separate task to reduce memory pressure
         # First, make sure we have a valid video path for the greenscreen process
-        if process_video_path is None:
-            # If we used JPG sequence and don't have a local video file
-            # We need to download the original video for greenscreen processing
-            logger.info("Downloading original video for greenscreen processing")
-            temp_video = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4')
-            temp_files.append(temp_video.name)
-            
-            # Download the original video (not forward-reverse)
-            s3_client.download_file(BUCKET_NAME, video.s3_key, temp_video.name)
-            original_video_path = temp_video.name
-        else:
-            original_video_path = process_video_path.name
 
         # Now call greenscreen with the valid path
         await create_greenscreen_async(video_id, original_video_path, upload_path, task_id)
@@ -523,7 +530,7 @@ async def transcode_video(
 async def transcode_to_jpg_sequence(
     input_path: str,
     output_dir: str,
-    fps: int = None,
+    fps: float = None,
     delete_original: bool = False
 ) -> str:
     """
@@ -539,7 +546,7 @@ async def transcode_to_jpg_sequence(
         # Get original video fps if not specified
         if fps is None:
             cap = cv2.VideoCapture(input_path)
-            fps = int(cap.get(cv2.CAP_PROP_FPS))
+            fps = cap.get(cv2.CAP_PROP_FPS)
             cap.release()
             logger.info(f"Using original video fps: {fps}")
 
@@ -625,7 +632,7 @@ async def process_uploaded_video(
 
         # Get video metadata and thumbnail frame first
         cap = cv2.VideoCapture(process_path)
-        fps = int(cap.get(cv2.CAP_PROP_FPS))
+        fps = cap.get(cv2.CAP_PROP_FPS)
         metadata = {
             "fps": fps,
             "frame_count": int(cap.get(cv2.CAP_PROP_FRAME_COUNT)),
